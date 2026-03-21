@@ -72,18 +72,20 @@
 <main class="game">
 	<header>
 		<div class="prompt">{gs.room?.prompt ?? 'Waiting for prompt...'}</div>
-		<TextInput
-			value={gs.promptInput}
-			oninput={(e) => handlePromptInput(e.currentTarget.value)}
-			onkeydown={(e) => {
-				if (e.key === 'Enter') submitPrompt();
-			}}
-			placeholder="Type your answer, press Enter to submit"
-			autocomplete="off"
-			autocorrect="off"
-			autocapitalize="off"
-			spellcheck="false"
-		/>
+		<div class="input-container">
+			<TextInput
+				value={gs.promptInput}
+				oninput={(e) => handlePromptInput(e.currentTarget.value)}
+				onkeydown={(e) => {
+					if (e.key === 'Enter') submitPrompt();
+				}}
+				placeholder="Type your answer, press Enter to submit"
+				autocomplete="off"
+				autocorrect="off"
+				autocapitalize="off"
+				spellcheck="false"
+			/>
+		</div>
 		{#if gs.latestRoundSummary}
 			<div class="result">{gs.latestRoundSummary}</div>
 		{/if}
@@ -151,6 +153,13 @@
 	.prompt {
 		font-size: 1.2rem;
 		text-align: center;
+	}
+
+	.input-container {
+		display: flex;
+		margin: 0 auto;
+		width: 100%;
+		max-width: 500px;
 	}
 
 	.result {

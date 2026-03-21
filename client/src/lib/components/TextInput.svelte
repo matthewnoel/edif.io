@@ -12,6 +12,7 @@
 
 <style>
 	.input {
+		flex: 1;
 		background: transparent;
 		color: inherit;
 		border: 1px solid var(--color-primary);
