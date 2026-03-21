@@ -220,20 +220,22 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                         continue;
                     };
                     player.connected = true;
-                    let prompt = if room.prompt.is_empty() {
+                    
+                    if room.prompt.is_empty() {
                         None
                     } else {
                         Some((room.round_id, room.prompt.clone()))
-                    };
-                    prompt
+                    }
                 };
 
                 {
                     let mut connections = state.connections.lock().await;
-                    connections
-                        .entry(found_code.clone())
-                        .or_default()
-                        .insert(found_pid, RoomConnection { sender: client_tx.clone() });
+                    connections.entry(found_code.clone()).or_default().insert(
+                        found_pid,
+                        RoomConnection {
+                            sender: client_tx.clone(),
+                        },
+                    );
                 }
 
                 player_id = Some(found_pid);
