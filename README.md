@@ -23,23 +23,8 @@ Recommended Node Version Managers: [fnm](https://github.com/Schniz/fnm) or [nvm]
 
 ### 1. Start the unified game server
 
-From repo root:
-
 ```sh
 cargo run -p server
-```
-
-By default it binds to `0.0.0.0:4000`.
-
-Optional server env vars:
-
-- `BIND_ADDR` (default: `0.0.0.0:4000`)
-- `GROWTH_PER_ROUND_WIN` (default: `4.0`)
-
-Example:
-
-```sh
-BIND_ADDR=0.0.0.0:4000 GROWTH_PER_ROUND_WIN=4 cargo run -p server
 ```
 
 ### 2. Start the client
@@ -53,19 +38,14 @@ npm install
 npm run dev
 ```
 
-Client defaults to connecting to `/ws` on the same host, so with local defaults it will connect to the server on port `4000`.
-
 ## Test and Validation
-
-From repo root:
 
 ```sh
 cargo test --workspace
 ```
 
-From `client`:
-
 ```sh
+cd client
 npm run check
 npm run lint
 npm run test:unit -- --run
