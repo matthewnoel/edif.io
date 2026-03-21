@@ -1,0 +1,5 @@
+target/
+client/node_modules/
+client/.svelte-kit/
+client/build/
+.git/
