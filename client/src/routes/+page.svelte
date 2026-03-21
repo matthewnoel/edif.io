@@ -11,6 +11,7 @@
 	} from '$lib/game/connection.svelte';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
+	import Select from '$lib/components/Select.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
@@ -67,10 +68,13 @@
 	{/if}
 	<label>
 		Game mode
-		<select bind:value={selectedGameMode}>
-			<option value="keyboarding">Keyboarding</option>
-			<option value="arithmetic">Arithmetic</option>
-		</select>
+		<Select
+			bind:value={selectedGameMode}
+			options={[
+				{ value: 'keyboarding', label: 'Keyboarding' },
+				{ value: 'arithmetic', label: 'Arithmetic' }
+			]}
+		/>
 	</label>
 	<label>
 		Your name (optional)
@@ -131,11 +135,6 @@
 		display: grid;
 		gap: 0.25rem;
 		font-size: 0.92rem;
-	}
-
-	select {
-		padding: 0.6rem;
-		color: inherit;
 	}
 
 	.buttons {
