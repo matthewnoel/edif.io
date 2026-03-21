@@ -81,7 +81,7 @@
 
 <main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
 	<header>
-		<div class="prompt">{gs.room?.prompt ?? 'Waiting for prompt...'}</div>
+		<div class="prompt"><strong>{gs.room?.prompt ?? 'Waiting for prompt...'}</strong></div>
 		<div class="input-container">
 			<TextInput
 				value={gs.promptInput}
@@ -97,7 +97,9 @@
 			/>
 		</div>
 		{#if gs.latestRoundSummary}
-			<div class="result">{gs.latestRoundSummary}</div>
+			<div class="result" style:color={gs.latestRoundSummaryColor || null}>
+				{gs.latestRoundSummary}
+			</div>
 		{/if}
 	</header>
 	<div class="arena" bind:this={arenaEl}>
@@ -161,19 +163,22 @@
 	}
 
 	.prompt {
-		font-size: 1.2rem;
+		font-size: 2rem;
 		text-align: center;
+		margin-bottom: 0.75rem;
 	}
 
 	.input-container {
 		display: flex;
 		margin: 0 auto;
 		width: 100%;
-		max-width: 500px;
+		max-width: 400px;
 	}
 
 	.result {
 		font-size: 0.9rem;
+		text-align: center;
+		margin-top: 0.25rem;
 	}
 
 	.arena {
