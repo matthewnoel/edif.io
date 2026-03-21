@@ -25,6 +25,16 @@
 	let blobLayout: BlobLayout = $state({});
 	let debugOpen = $state(false);
 	let animationHandle = 0;
+	let visualHeight = $state(0);
+
+	$effect(() => {
+		function update() {
+			visualHeight = window.visualViewport?.height ?? window.innerHeight;
+		}
+		update();
+		window.visualViewport?.addEventListener('resize', update);
+		return () => window.visualViewport?.removeEventListener('resize', update);
+	});
 
 	function animate(): void {
 		if (gs.room && arenaEl) {
@@ -69,7 +79,7 @@
 	});
 </script>
 
-<main class="game">
+<main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
 	<header>
 		<div class="prompt">{gs.room?.prompt ?? 'Waiting for prompt...'}</div>
 		<div class="input-container">
@@ -226,5 +236,18 @@
 	dd {
 		margin: 0;
 		text-align: right;
+	}
+
+	@media (max-width: 768px) and (orientation: portrait) {
+		main {
+			min-height: 0;
+			height: var(--vvh, 100vh);
+			max-height: var(--vvh, 100vh);
+			overflow: hidden;
+		}
+
+		.arena {
+			min-height: 0;
+		}
 	}
 </style>
