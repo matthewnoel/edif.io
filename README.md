@@ -61,3 +61,8 @@ npm run test:unit -- --run
 
  - Keyboarding: *Type the global prompt correctly first to gain points.*
  - Arithmetic: *Proof of concept intended to implement the functionality of: [https://github.com/matthewnoel/arithmetic-practice](https://github.com/matthewnoel/arithmetic-practice)*
+
+ ## Deployment
+
+The app is containerized via `Dockerfile` and uses Caddy as a reverse proxy.
+It can be deployed to any Docker-capable host.
