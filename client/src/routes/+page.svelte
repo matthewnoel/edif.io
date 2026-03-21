@@ -68,7 +68,7 @@
 			</label>
 		{/if}
 		<label>
-			Game mode
+			<strong>Game Mode:</strong>
 			<Select
 				bind:value={selectedGameMode}
 				options={[
@@ -78,7 +78,7 @@
 			/>
 		</label>
 		<label>
-			Your name (optional)
+			<strong>Your Name (optional):</strong>
 			<TextInput
 				bind:value={playerName}
 				placeholder="Player name"
@@ -89,7 +89,7 @@
 			/>
 		</label>
 		<label>
-			Room code (optional)
+			<strong>Room Code (optional):</strong>
 			<TextInput
 				bind:value={roomCodeInput}
 				placeholder="ABCD"
@@ -102,11 +102,11 @@
 		</label>
 		<div class="buttons">
 			<Button
-				label="Create room"
+				label="Create Room"
 				onclick={createRoom}
 				disabled={gs.phase === 'connecting' || !!code}
 			/>
-			<Button label="Join room" onclick={joinRoom} disabled={gs.phase === 'connecting' || !code} />
+			<Button label="Join Room" onclick={joinRoom} disabled={gs.phase === 'connecting' || !code} />
 		</div>
 		{#if gs.errorMessage}
 			<p class="error">{gs.errorMessage}</p>

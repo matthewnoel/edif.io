@@ -35,7 +35,7 @@
 		flex: 1;
 		background: transparent;
 		color: inherit;
-		border: 1px solid black;
+		border: 2px solid black;
 		border-radius: 0.5rem;
 		padding: 0.6rem;
 		font-size: inherit;

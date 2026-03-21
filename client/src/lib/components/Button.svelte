@@ -33,7 +33,7 @@
 	onfocusin={activate}
 	onfocusout={deactivate}
 >
-	{label}
+	<strong>{label}</strong>
 </button>
 
 <style>
