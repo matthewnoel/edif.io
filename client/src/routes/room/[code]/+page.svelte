@@ -17,6 +17,7 @@
 	} from '$lib/game/connection.svelte';
 	import { nextBlobLayout, type BlobLayout } from '$lib/game/sim';
 	import type { PlayerSnapshot } from '$lib/game/protocol';
+	import { debugMode } from '$lib/debug';
 
 	let arenaEl: HTMLDivElement | null = $state(null);
 	let blobLayout: BlobLayout = $state({});
@@ -99,29 +100,31 @@
 			{/each}
 		{/if}
 	</div>
-	<aside class="debug">
-		<button onclick={() => (debugOpen = !debugOpen)}>
-			{debugOpen ? 'Hide' : 'ℹ️ Stats for nerds'}
-		</button>
-		{#if debugOpen}
-			<dl>
-				<dt>game</dt>
-				<dd>{gs.gameKey || 'unknown'}</dd>
-				<dt>room</dt>
-				<dd>{gs.room?.roomCode ?? '-'}</dd>
-				<dt>socket</dt>
-				<dd>{socketStateLabel()}</dd>
-				<dt>inbound</dt>
-				<dd>{gs.inboundCount}</dd>
-				<dt>outbound</dt>
-				<dd>{gs.outboundCount}</dd>
-				<dt>players</dt>
-				<dd>{gs.room?.players.length ?? 0}</dd>
-				<dt>min eat size</dt>
-				<dd>{gs.minEatableSize.toFixed(1)}</dd>
-			</dl>
-		{/if}
-	</aside>
+	{#if debugMode}
+		<aside class="debug">
+			<button onclick={() => (debugOpen = !debugOpen)}>
+				{debugOpen ? 'Hide' : 'ℹ️ Stats for nerds'}
+			</button>
+			{#if debugOpen}
+				<dl>
+					<dt>game</dt>
+					<dd>{gs.gameKey || 'unknown'}</dd>
+					<dt>room</dt>
+					<dd>{gs.room?.roomCode ?? '-'}</dd>
+					<dt>socket</dt>
+					<dd>{socketStateLabel()}</dd>
+					<dt>inbound</dt>
+					<dd>{gs.inboundCount}</dd>
+					<dt>outbound</dt>
+					<dd>{gs.outboundCount}</dd>
+					<dt>players</dt>
+					<dd>{gs.room?.players.length ?? 0}</dd>
+					<dt>min eat size</dt>
+					<dd>{gs.minEatableSize.toFixed(1)}</dd>
+				</dl>
+			{/if}
+		</aside>
+	{/if}
 </main>
 
 <style>

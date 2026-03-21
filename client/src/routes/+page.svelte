@@ -9,11 +9,13 @@
 		defaultWsUrl,
 		type GameMode
 	} from '$lib/game/connection.svelte';
+	import { debugMode } from '$lib/debug';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let playerName = $state('');
 	let roomCodeInput = $state('');
 	let selectedGameMode = $state<GameMode>('keyboarding');
+	let code = $derived(roomCodeInput.trim().toUpperCase());
 
 	onMount(() => {
 		wsUrl = defaultWsUrl();
@@ -34,7 +36,6 @@
 	}
 
 	function joinRoom(): void {
-		const code = roomCodeInput.trim().toUpperCase();
 		if (!code) {
 			gs.errorMessage = 'Enter a room code to join';
 			return;
@@ -48,12 +49,9 @@
 </script>
 
 <main class="pregame">
-	<h1>edif.io</h1>
-	<p class="subtitle">
-		Pluggable grow-to-win quiz game for practicing keyboarding, arithmetic, and more...
-	</p>
+	<h1>New Game</h1>
 	<label>
-		Name (optional)
+		Your name (optional)
 		<input
 			bind:value={playerName}
 			placeholder="Player name"
@@ -70,17 +68,19 @@
 			<option value="arithmetic">Arithmetic</option>
 		</select>
 	</label>
-	<label>
-		Server URL
-		<input
-			bind:value={wsUrl}
-			placeholder="ws://localhost:4000/ws"
-			autocomplete="off"
-			autocorrect="off"
-			autocapitalize="off"
-			spellcheck="false"
-		/>
-	</label>
+	{#if debugMode}
+		<label>
+			Server URL
+			<input
+				bind:value={wsUrl}
+				placeholder="ws://localhost:4000/ws"
+				autocomplete="off"
+				autocorrect="off"
+				autocapitalize="off"
+				spellcheck="false"
+			/>
+		</label>
+	{/if}
 	<label>
 		Room code
 		<input
@@ -94,23 +94,29 @@
 		/>
 	</label>
 	<div class="buttons">
-		<button onclick={createRoom} disabled={gs.phase === 'connecting'}>Create room</button>
-		<button onclick={joinRoom} disabled={gs.phase === 'connecting'}>Join room</button>
+		<button onclick={createRoom} disabled={gs.phase === 'connecting' || !!code}>Create room</button>
+		<button onclick={joinRoom} disabled={gs.phase === 'connecting' || !code}>Join room</button>
 	</div>
 	{#if gs.errorMessage}
 		<p class="error">{gs.errorMessage}</p>
 	{/if}
-	<p class="meta">socket: {gs.socketState}</p>
-	{#if gs.lastSocketDetail}
-		<p class="meta">{gs.lastSocketDetail}</p>
+		{#if debugMode}
+		<p class="meta">socket: {gs.socketState}</p>
+		{#if gs.lastSocketDetail}
+			<p class="meta">{gs.lastSocketDetail}</p>
+		{/if}
 	{/if}
 </main>
 
 <style>
+	h1 {
+		text-align: center;
+		margin: 1rem 0 0 0;
+	}
 	.pregame {
 		max-width: 460px;
 		margin: 0 auto;
-		padding: 2.5rem 1.25rem;
+		padding: 0.5rem 1.25rem;
 		display: grid;
 		gap: 0.75rem;
 	}
