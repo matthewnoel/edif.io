@@ -220,7 +220,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                         continue;
                     };
                     player.connected = true;
-                    
+
                     if room.prompt.is_empty() {
                         None
                     } else {

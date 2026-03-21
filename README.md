@@ -56,3 +56,8 @@ npm run test:unit -- --run
 1. Add a new adapter crate under `adapters/` implementing `core::GameAdapter`.
 2. Register the adapter in `server/src/main.rs`.
 3. Add the mode to the client pregame selector in `client/src/routes/+page.svelte`.
+
+## Current Game Modes
+
+ - Keyboarding: *Type the global prompt correctly first to gain points.*
+ - Arithmetic: *Proof of concept intended to implement the functionality of: [https://github.com/matthewnoel/arithmetic-practice](https://github.com/matthewnoel/arithmetic-practice)*
