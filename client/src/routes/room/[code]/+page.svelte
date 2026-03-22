@@ -126,7 +126,7 @@
 						<Button label="Start Match" onclick={startMatch} />
 					</div>
 				{:else}
-					<div class="lobby-wait">Waiting for host to start...</div>
+					<div class="lobby-wait shizuru-regular">Waiting for host to start...</div>
 				{/if}
 			</div>
 		{:else}
@@ -238,8 +238,9 @@
 	}
 
 	.lobby-wait {
-		font-size: 1.2rem;
-		opacity: 0.7;
+		font-size: 3rem;
+		margin: 0 auto;
+		max-width: 400px;
 	}
 
 	.timer {

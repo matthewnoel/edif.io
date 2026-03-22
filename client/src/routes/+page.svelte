@@ -140,7 +140,7 @@
 
 <style>
 	h1 {
-		font-size: 3rem;
+		font-size: 4rem;
 		text-align: center;
 		margin: 1rem 0 0 0;
 	}
@@ -155,7 +155,7 @@
 		width: 100%;
 		max-width: 460px;
 		margin: 0 auto;
-		padding: 0.5rem 1.25rem 5rem 1.25rem;
+		padding: 0.5rem 1.25rem 10rem 1.25rem;
 		display: grid;
 		gap: 0.75rem;
 	}
