@@ -488,26 +488,27 @@ async fn handle_submission(
                 should_advance_round = room.match_winner.is_none();
 
                 let now = Instant::now();
-                let mut i = 0;
-                while i < room.powerup_offers.len() {
-                    if room.powerup_offers[i].player_id == player_id
-                        && room.powerup_offers[i].expires_at > now
-                    {
-                        let offer = room.powerup_offers.swap_remove(i);
-                        let duration = effect_duration(offer.kind);
-                        room.active_powerups.push(ActivePowerUp {
-                            kind: offer.kind,
-                            source_player_id: player_id,
-                            expires_at: now + duration,
-                        });
-                        earned_powerups.push(ServerMessage::PowerUpActivated {
-                            player_id,
-                            kind: offer.kind,
-                            duration_ms: duration.as_millis() as u64,
-                        });
-                    } else {
-                        i += 1;
-                    }
+                let oldest_idx = room
+                    .powerup_offers
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, o)| o.player_id == player_id && o.expires_at > now)
+                    .min_by_key(|(_, o)| o.expires_at)
+                    .map(|(idx, _)| idx);
+
+                if let Some(idx) = oldest_idx {
+                    let offer = room.powerup_offers.swap_remove(idx);
+                    let duration = effect_duration(offer.kind);
+                    room.active_powerups.push(ActivePowerUp {
+                        kind: offer.kind,
+                        source_player_id: player_id,
+                        expires_at: now + duration,
+                    });
+                    earned_powerups.push(ServerMessage::PowerUpActivated {
+                        player_id,
+                        kind: offer.kind,
+                        duration_ms: duration.as_millis() as u64,
+                    });
                 }
             }
         }

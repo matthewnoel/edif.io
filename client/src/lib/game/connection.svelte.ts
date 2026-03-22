@@ -166,12 +166,19 @@ function handleServerMessage(message: ServerMessage): void {
 				{ kind: message.kind, expiresAt: performance.now() + message.expiresInMs }
 			];
 			break;
-		case 'powerUpOfferExpired':
-			gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.kind !== message.kind);
+		case 'powerUpOfferExpired': {
+			const idx = gs.pendingPowerUps.findIndex((pu) => pu.kind === message.kind);
+			if (idx !== -1) {
+				gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
+			}
 			break;
+		}
 		case 'powerUpActivated':
 			if (message.playerId === gs.playerId) {
-				gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.kind !== message.kind);
+				const idx = gs.pendingPowerUps.findIndex((pu) => pu.kind === message.kind);
+				if (idx !== -1) {
+					gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
+				}
 			}
 			break;
 		case 'powerUpEffectEnded':
