@@ -13,7 +13,8 @@
 		socketStateLabel,
 		defaultWsUrl,
 		loadSession,
-		loadRejoinToken
+		loadRejoinToken,
+		disconnect
 	} from '$lib/game/connection.svelte';
 	import { nextBlobLayout, type BlobLayout } from '$lib/game/sim';
 	import type { PlayerSnapshot } from '$lib/game/protocol';
@@ -53,6 +54,15 @@
 		return Math.max(42, Math.min(220, player.size * 4));
 	}
 
+	function leaveRoom(): void {
+		disconnect();
+		goto(resolve('/'));
+	}
+
+	function copyRoomLink(): void {
+		navigator.clipboard.writeText(window.location.href);
+	}
+
 	onMount(() => {
 		setOnDisconnect(() => goto(resolve('/')));
 
@@ -80,6 +90,9 @@
 </script>
 
 <main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
+	<div class="leave">
+		<Button label="Leave" onclick={leaveRoom} />
+	</div>
 	<header>
 		<div class="prompt"><strong>{gs.room?.prompt ?? 'Waiting for prompt...'}</strong></div>
 		<div class="input-container">
@@ -116,6 +129,16 @@
 			{/each}
 		{/if}
 	</div>
+	{#if gs.room?.roomCode}
+		<div class="room">
+			<input
+				type="button"
+				class="shizuru-regular"
+				value={gs.room.roomCode}
+				onclick={copyRoomLink}
+			/>
+		</div>
+	{/if}
 	{#if debugMode}
 		<aside class="debug">
 			<Button
@@ -165,7 +188,7 @@
 	.prompt {
 		font-size: 2rem;
 		text-align: center;
-		margin-bottom: 0.75rem;
+		margin: 4rem 0 2rem 0;
 	}
 
 	.input-container {
@@ -215,6 +238,31 @@
 	.size,
 	.progress {
 		font-size: 0.75rem;
+	}
+
+	.leave {
+		position: fixed;
+		top: 0.5rem;
+		left: 0.5rem;
+		right: 0.5rem;
+		z-index: 3;
+	}
+
+	.room {
+		position: fixed;
+		bottom: 2rem;
+		left: 0.5rem;
+		right: 0.5rem;
+		z-index: 3;
+		text-align: center;
+	}
+
+	.room input[type='button'] {
+		background-color: transparent;
+		border: none;
+		color: black;
+		font-size: 3rem;
+		cursor: pointer;
 	}
 
 	.debug {
