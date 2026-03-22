@@ -68,6 +68,17 @@ pub struct RoomState {
 }
 
 impl RoomState {
+    pub fn reset_for_rematch(&mut self) {
+        self.match_winner = None;
+        self.match_deadline = None;
+        self.prompt.clear();
+        self.round_id = 0;
+        for player in self.players.values_mut() {
+            player.size = DEFAULT_START_SIZE;
+            player.progress.clear();
+        }
+    }
+
     pub fn to_snapshot(&self) -> RoomSnapshot {
         let mut players: Vec<PlayerSnapshot> = self
             .players
@@ -198,6 +209,29 @@ mod tests {
         room.players.get_mut(&1).unwrap().size = 99.0;
         resolve_match_by_timer(&mut room);
         assert_eq!(room.match_winner, Some(2));
+    }
+
+    #[test]
+    fn reset_for_rematch_clears_match_state() {
+        let mut room = test_room();
+        room.match_winner = Some(1);
+        room.match_deadline = Some(Instant::now());
+        room.prompt = "old prompt".to_string();
+        room.round_id = 5;
+        room.players.get_mut(&1).unwrap().size = 30.0;
+        room.players.get_mut(&2).unwrap().size = 20.0;
+        room.players.get_mut(&1).unwrap().progress = "partial".to_string();
+
+        room.reset_for_rematch();
+
+        assert_eq!(room.match_winner, None);
+        assert!(room.match_deadline.is_none());
+        assert!(room.prompt.is_empty());
+        assert_eq!(room.round_id, 0);
+        assert_eq!(room.players.len(), 2);
+        assert_eq!(room.players.get(&1).unwrap().size, DEFAULT_START_SIZE);
+        assert_eq!(room.players.get(&2).unwrap().size, DEFAULT_START_SIZE);
+        assert!(room.players.get(&1).unwrap().progress.is_empty());
     }
 
     #[test]

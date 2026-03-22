@@ -25,6 +25,7 @@ pub enum ClientMessage {
         text: String,
     },
     StartMatch,
+    Rematch,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -92,6 +93,9 @@ mod tests {
 
         let start = r#"{"type":"startMatch"}"#;
         assert!(serde_json::from_str::<ClientMessage>(start).is_ok());
+
+        let rematch = r#"{"type":"rematch"}"#;
+        assert!(serde_json::from_str::<ClientMessage>(rematch).is_ok());
     }
 
     #[test]

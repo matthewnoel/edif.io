@@ -284,6 +284,11 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     handle_start_match(&state, code, pid).await;
                 }
             }
+            ClientMessage::Rematch => {
+                if let (Some(_pid), Some(code)) = (player_id, room_code.as_ref()) {
+                    handle_rematch(&state, code).await;
+                }
+            }
         }
     }
 
@@ -470,6 +475,28 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
         if player_id != room.host_player_id || room.match_deadline.is_some() {
             return;
         }
+        duration_secs = room.match_duration_secs;
+        let deadline = Instant::now() + Duration::from_secs(duration_secs);
+        room.match_deadline = Some(deadline);
+    }
+
+    start_match_timer(state.clone(), room_code.to_string(), duration_secs);
+
+    let _ = broadcast_room_state(state, room_code).await;
+    let _ = ensure_prompt_for_room(state, room_code).await;
+}
+
+async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
+    let duration_secs;
+    {
+        let mut rooms = state.rooms.lock().await;
+        let Some(room) = rooms.get_mut(room_code) else {
+            return;
+        };
+        if room.match_winner.is_none() {
+            return;
+        }
+        room.reset_for_rematch();
         duration_secs = room.match_duration_secs;
         let deadline = Instant::now() + Duration::from_secs(duration_secs);
         room.match_deadline = Some(deadline);

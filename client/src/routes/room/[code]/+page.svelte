@@ -11,6 +11,7 @@
 		handlePromptInput,
 		submitPrompt,
 		startMatch,
+		rematch,
 		socketStateLabel,
 		defaultWsUrl,
 		loadSession,
@@ -122,7 +123,7 @@
 			<div class="lobby">
 				{#if gs.playerId === gs.room.hostPlayerId}
 					<div class="lobby-start">
-						<Button label="Start" onclick={startMatch} />
+						<Button label="Start Match" onclick={startMatch} />
 					</div>
 				{:else}
 					<div class="lobby-wait">Waiting for host to start...</div>
@@ -136,7 +137,9 @@
 			{#if gs.room?.matchWinner}
 				<div class="game-over-container">
 					<h1 class="shizuru-regular">Game Over</h1>
-					<Button label="Home" onclick={leaveRoom} />
+					<div class="rematch-container">
+						<Button label="Rematch" onclick={rematch} />
+					</div>
 				</div>
 			{:else}
 				<div class="input-container">
@@ -234,11 +237,6 @@
 		margin-top: 6rem;
 	}
 
-	.lobby-start {
-		display: flex;
-		justify-content: center;
-	}
-
 	.lobby-wait {
 		font-size: 1.2rem;
 		opacity: 0.7;
@@ -325,6 +323,19 @@
 		left: 0.5rem;
 		right: 0.5rem;
 		z-index: 3;
+	}
+
+	.rematch-container,
+	.lobby-start {
+		display: flex;
+		justify-content: center;
+		width: 100%;
+		max-width: 25rem;
+		padding: 1rem 0 2rem 0;
+	}
+
+	.lobby-start {
+		margin: 0 auto;
 	}
 
 	.room {

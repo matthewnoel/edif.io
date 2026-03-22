@@ -28,7 +28,8 @@ export type ClientMessage =
 	| { type: 'rejoinRoom'; rejoinToken: string }
 	| { type: 'inputUpdate'; text: string }
 	| { type: 'submitAttempt'; text: string }
-	| { type: 'startMatch' };
+	| { type: 'startMatch' }
+	| { type: 'rematch' };
 
 export type ServerMessage =
 	| {

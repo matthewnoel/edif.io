@@ -245,3 +245,10 @@ export function submitPrompt(): void {
 export function startMatch(): void {
 	sendClientMessage({ type: 'startMatch' });
 }
+
+export function rematch(): void {
+	gs.latestRoundSummary = '';
+	gs.latestRoundSummaryColor = '';
+	gs.promptInput = '';
+	sendClientMessage({ type: 'rematch' });
+}
