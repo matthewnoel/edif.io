@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 pub const DEFAULT_START_SIZE: f32 = 10.0;
+pub const MIN_PLAYER_SIZE: f32 = 1.0;
 
 pub type PlayerId = u64;
 
@@ -124,6 +125,18 @@ pub fn apply_round_win(
     })
 }
 
+pub fn apply_wrong_answer_penalty(
+    room: &mut RoomState,
+    player_id: PlayerId,
+    penalty: f32,
+) -> Option<f32> {
+    let player = room.players.get_mut(&player_id)?;
+    let old_size = player.size;
+    player.size = (player.size - penalty).max(MIN_PLAYER_SIZE);
+    player.progress.clear();
+    Some(old_size - player.size)
+}
+
 pub fn resolve_match_by_timer(room: &mut RoomState) {
     if room.match_winner.is_some() || room.players.is_empty() {
         return;
@@ -240,5 +253,36 @@ mod tests {
         room.players.clear();
         resolve_match_by_timer(&mut room);
         assert_eq!(room.match_winner, None);
+    }
+
+    #[test]
+    fn wrong_answer_penalty_reduces_size() {
+        let mut room = test_room();
+        let shrink = apply_wrong_answer_penalty(&mut room, 1, 3.0).unwrap();
+        assert_eq!(shrink, 3.0);
+        assert_eq!(room.players.get(&1).unwrap().size, 7.0);
+        assert_eq!(room.players.get(&2).unwrap().size, 10.0);
+    }
+
+    #[test]
+    fn wrong_answer_penalty_clamps_to_min() {
+        let mut room = test_room();
+        let shrink = apply_wrong_answer_penalty(&mut room, 1, 100.0).unwrap();
+        assert_eq!(shrink, 9.0);
+        assert_eq!(room.players.get(&1).unwrap().size, MIN_PLAYER_SIZE);
+    }
+
+    #[test]
+    fn wrong_answer_penalty_returns_none_for_missing_player() {
+        let mut room = test_room();
+        assert!(apply_wrong_answer_penalty(&mut room, 99, 3.0).is_none());
+    }
+
+    #[test]
+    fn wrong_answer_penalty_clears_progress() {
+        let mut room = test_room();
+        room.players.get_mut(&1).unwrap().progress = "partial".to_string();
+        apply_wrong_answer_penalty(&mut room, 1, 2.0);
+        assert!(room.players.get(&1).unwrap().progress.is_empty());
     }
 }

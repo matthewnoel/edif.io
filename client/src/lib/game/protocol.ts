@@ -49,6 +49,7 @@ export type ServerMessage =
 			winnerPlayerId: number;
 			growthAwarded: number;
 	  }
+	| { type: 'wrongAnswer'; roomCode: string; playerId: number; shrinkApplied: number }
 	| { type: 'error'; message: string };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -112,6 +113,12 @@ function isServerMessage(value: unknown): value is ServerMessage {
 				typeof value.roundId === 'number' &&
 				typeof value.winnerPlayerId === 'number' &&
 				typeof value.growthAwarded === 'number'
+			);
+		case 'wrongAnswer':
+			return (
+				typeof value.roomCode === 'string' &&
+				typeof value.playerId === 'number' &&
+				typeof value.shrinkApplied === 'number'
 			);
 		case 'error':
 			return typeof value.message === 'string';

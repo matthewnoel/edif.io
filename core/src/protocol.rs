@@ -68,6 +68,14 @@ pub enum ServerMessage {
         #[serde(rename = "growthAwarded")]
         growth_awarded: f32,
     },
+    WrongAnswer {
+        #[serde(rename = "roomCode")]
+        room_code: String,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        #[serde(rename = "shrinkApplied")]
+        shrink_applied: f32,
+    },
     Error {
         message: String,
     },
@@ -102,5 +110,19 @@ mod tests {
     fn rejects_removed_ping_message() {
         let ping = r#"{"type":"ping","sentAtMs":123}"#;
         assert!(serde_json::from_str::<ClientMessage>(ping).is_err());
+    }
+
+    #[test]
+    fn serializes_wrong_answer_message() {
+        let msg = super::ServerMessage::WrongAnswer {
+            room_code: "ABCD".to_string(),
+            player_id: 1,
+            shrink_applied: 2.0,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"wrongAnswer""#));
+        assert!(json.contains(r#""roomCode":"ABCD""#));
+        assert!(json.contains(r#""playerId":1"#));
+        assert!(json.contains(r#""shrinkApplied":2.0"#));
     }
 }

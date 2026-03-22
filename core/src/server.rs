@@ -1,6 +1,7 @@
 use crate::adapter::{AdapterHandle, AdapterRegistry, build_adapter_registry};
 use crate::game::{
-    DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win, resolve_match_by_timer,
+    DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
+    apply_wrong_answer_penalty, resolve_match_by_timer,
 };
 use crate::protocol::{ClientMessage, ServerMessage};
 use axum::Router;
@@ -23,6 +24,7 @@ use tokio::sync::{Mutex, mpsc};
 pub struct ServerConfig {
     pub bind_addr: String,
     pub growth_per_round_win: f32,
+    pub shrink_per_wrong_answer: f32,
     pub match_duration_secs: u64,
 }
 
@@ -31,6 +33,7 @@ impl Default for ServerConfig {
         Self {
             bind_addr: "0.0.0.0:4000".to_string(),
             growth_per_round_win: 4.0,
+            shrink_per_wrong_answer: 2.0,
             match_duration_secs: 60,
         }
     }
@@ -425,6 +428,7 @@ async fn handle_submission(
     };
     let mut should_advance_round = false;
     let mut round_result: Option<ServerMessage> = None;
+    let mut wrong_answer_msg: Option<ServerMessage> = None;
 
     {
         let mut rooms = state.rooms.lock().await;
@@ -437,22 +441,35 @@ async fn handle_submission(
         }
 
         if !adapter.is_correct(&room.prompt, &text) {
-            return;
+            let penalty = state.config.shrink_per_wrong_answer;
+            if let Some(shrink) = apply_wrong_answer_penalty(room, player_id, penalty) {
+                wrong_answer_msg = Some(ServerMessage::WrongAnswer {
+                    room_code: room_code.to_string(),
+                    player_id,
+                    shrink_applied: shrink,
+                });
+            }
+        } else {
+            let configured_growth = state.config.growth_per_round_win;
+            let growth = adapter
+                .score_for_prompt(&room.prompt)
+                .max(configured_growth);
+            if let Some(resolution) = apply_round_win(room, player_id, growth) {
+                round_result = Some(ServerMessage::RoundResult {
+                    room_code: room_code.to_string(),
+                    round_id: room.round_id,
+                    winner_player_id: resolution.round_winner,
+                    growth_awarded: growth,
+                });
+                should_advance_round = room.match_winner.is_none();
+            }
         }
+    }
 
-        let configured_growth = state.config.growth_per_round_win;
-        let growth = adapter
-            .score_for_prompt(&room.prompt)
-            .max(configured_growth);
-        if let Some(resolution) = apply_round_win(room, player_id, growth) {
-            round_result = Some(ServerMessage::RoundResult {
-                room_code: room_code.to_string(),
-                round_id: room.round_id,
-                winner_player_id: resolution.round_winner,
-                growth_awarded: growth,
-            });
-            should_advance_round = room.match_winner.is_none();
-        }
+    if let Some(msg) = wrong_answer_msg {
+        let _ = broadcast_to_room(state, room_code, &msg).await;
+        let _ = broadcast_room_state(state, room_code).await;
+        return;
     }
 
     if let Some(msg) = round_result {

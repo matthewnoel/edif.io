@@ -136,6 +136,21 @@ function handleServerMessage(message: ServerMessage): void {
 				gs.promptInput = '';
 			}
 			break;
+		case 'wrongAnswer':
+			if (!gs.room) break;
+			{
+				const isMe = message.playerId === gs.playerId;
+				if (isMe) {
+					gs.latestRoundSummary = `Wrong! -${message.shrinkApplied.toFixed(1)} size`;
+					gs.latestRoundSummaryColor = '#e74c3c';
+					gs.promptInput = '';
+				} else {
+					const player = gs.room.players.find((p) => p.id === message.playerId);
+					gs.latestRoundSummary = `${player?.name ?? `Player ${message.playerId}`} lost -${message.shrinkApplied.toFixed(1)} size`;
+					gs.latestRoundSummaryColor = player?.color ?? '';
+				}
+			}
+			break;
 		case 'error':
 			gs.errorMessage = message.message;
 			break;
