@@ -149,7 +149,7 @@
 						onkeydown={(e) => {
 							if (e.key === 'Enter') submitPrompt();
 						}}
-						placeholder={gs.inputPlaceholder || "Type your answer; press return."}
+						placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
 						autocomplete="off"
 						autocorrect="off"
 						autocapitalize="off"
