@@ -224,10 +224,10 @@
 							{#if isFrozen}
 								<div class="frozen-overlay">{POWERUP_EMOJI.freezeAllCompetitors} Frozen!</div>
 							{/if}
-						<TextInput
-							bind:el={promptInputEl}
-							value={gs.promptInput}
-							oninput={(e) => handlePromptInput(e.currentTarget.value)}
+							<TextInput
+								bind:el={promptInputEl}
+								value={gs.promptInput}
+								oninput={(e) => handlePromptInput(e.currentTarget.value)}
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && !isFrozen) submitPrompt();
 								}}
