@@ -18,7 +18,7 @@
 	let playerName = $state('');
 	let roomCodeInput = $state('');
 	let selectedGameMode = $state<GameMode>('keyboarding');
-	let code = $derived(roomCodeInput.trim().toUpperCase());
+	let code = $derived(roomCodeInput);
 
 	onMount(() => {
 		wsUrl = defaultWsUrl();
@@ -91,12 +91,18 @@
 		<label>
 			<strong>Room Code (optional):</strong>
 			<TextInput
-				bind:value={roomCodeInput}
+				value={roomCodeInput}
+				oninput={(e) => {
+					const el = e.currentTarget;
+					el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+					roomCodeInput = el.value;
+				}}
 				placeholder="ABCD"
-				maxlength={8}
+				maxlength={4}
+				pattern={"[A-Z]{4}"}
 				autocomplete="off"
 				autocorrect="off"
-				autocapitalize="off"
+				autocapitalize="characters"
 				spellcheck="false"
 			/>
 		</label>
