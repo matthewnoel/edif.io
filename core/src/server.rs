@@ -583,6 +583,13 @@ async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
     let _ = ensure_prompt_for_room(state, room_code).await;
 }
 
+fn splitmix64(val: u64) -> u64 {
+    let mut z = val.wrapping_add(0x9e3779b97f4a7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
 async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bool {
     let Some(adapter) = adapter_for_room(state, room_code).await else {
         return false;
@@ -596,7 +603,8 @@ async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bo
         if room.match_winner.is_some() || room.players.is_empty() || room.match_deadline.is_none() {
             return false;
         }
-        let seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+        let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+        let seed = splitmix64(raw_seed);
         room.round_id += 1;
         room.prompt = adapter.next_prompt(seed);
         for player in room.players.values_mut() {
