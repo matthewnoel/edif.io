@@ -133,6 +133,7 @@ function handleServerMessage(message: ServerMessage): void {
 				const winner = gs.room.players.find((p) => p.id === message.winnerPlayerId);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.winnerPlayerId}`} won +${message.growthAwarded.toFixed(1)} size`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';
+				gs.promptInput = '';
 			}
 			break;
 		case 'error':
