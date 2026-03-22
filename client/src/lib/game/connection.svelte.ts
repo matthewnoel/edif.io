@@ -147,6 +147,7 @@ export function connect(
 		roomCode?: string;
 		playerName?: string;
 		gameMode?: GameMode;
+		matchDurationSecs?: number;
 		rejoinToken?: string;
 	}
 ): void {
@@ -183,7 +184,8 @@ export function connect(
 				type: 'joinOrCreateRoom',
 				playerName: opts?.playerName?.trim() || undefined,
 				roomCode: opts?.roomCode ? normalizeRoomCode(opts.roomCode) : undefined,
-				gameMode: opts?.gameMode
+				gameMode: opts?.gameMode,
+				matchDurationSecs: opts?.matchDurationSecs
 			});
 		}
 	};

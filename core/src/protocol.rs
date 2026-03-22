@@ -11,6 +11,8 @@ pub enum ClientMessage {
         room_code: Option<String>,
         #[serde(rename = "gameMode")]
         game_mode: Option<String>,
+        #[serde(rename = "matchDurationSecs")]
+        match_duration_secs: Option<u64>,
     },
     RejoinRoom {
         #[serde(rename = "rejoinToken")]
@@ -76,7 +78,7 @@ mod tests {
 
     #[test]
     fn parses_all_supported_client_messages() {
-        let join = r#"{"type":"joinOrCreateRoom","playerName":"Alice","roomCode":"ABCD","gameMode":"keyboarding"}"#;
+        let join = r#"{"type":"joinOrCreateRoom","playerName":"Alice","roomCode":"ABCD","gameMode":"keyboarding","matchDurationSecs":90}"#;
         assert!(serde_json::from_str::<ClientMessage>(join).is_ok());
 
         let rejoin = r#"{"type":"rejoinRoom","rejoinToken":"abc123"}"#;

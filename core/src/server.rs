@@ -131,6 +131,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                 player_name,
                 room_code: requested_room_code,
                 game_mode,
+                match_duration_secs,
             } => {
                 if player_id.is_some() {
                     continue;
@@ -141,6 +142,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     player_name,
                     requested_room_code,
                     game_mode,
+                    match_duration_secs,
                     client_tx.clone(),
                 )
                 .await;
@@ -297,6 +299,7 @@ async fn join_or_create_room(
     player_name: Option<String>,
     requested_room_code: Option<String>,
     requested_game_mode: Option<String>,
+    requested_match_duration_secs: Option<u64>,
     sender: mpsc::UnboundedSender<Message>,
 ) -> Option<(String, String, PlayerId)> {
     let token = generate_rejoin_token();
@@ -322,6 +325,9 @@ async fn join_or_create_room(
                 None => state.default_game_key.clone(),
             };
             let generated = generate_room_code(&rooms);
+            let duration = requested_match_duration_secs
+                .filter(|&s| s > 0)
+                .unwrap_or(state.config.match_duration_secs);
             rooms.insert(
                 generated.clone(),
                 RoomState {
@@ -332,6 +338,7 @@ async fn join_or_create_room(
                     round_id: 0,
                     match_winner: None,
                     match_deadline: None,
+                    match_duration_secs: duration,
                     host_player_id: 1,
                     next_player_id: 1,
                 },
@@ -454,6 +461,7 @@ async fn handle_submission(
 }
 
 async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id: PlayerId) {
+    let duration_secs;
     {
         let mut rooms = state.rooms.lock().await;
         let Some(room) = rooms.get_mut(room_code) else {
@@ -462,14 +470,15 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
         if player_id != room.host_player_id || room.match_deadline.is_some() {
             return;
         }
-        let deadline = Instant::now() + Duration::from_secs(state.config.match_duration_secs);
+        duration_secs = room.match_duration_secs;
+        let deadline = Instant::now() + Duration::from_secs(duration_secs);
         room.match_deadline = Some(deadline);
     }
 
     start_match_timer(
         state.clone(),
         room_code.to_string(),
-        state.config.match_duration_secs,
+        duration_secs,
     );
 
     let _ = broadcast_room_state(state, room_code).await;
@@ -713,6 +722,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
+            None,
             sender,
         )
         .await
@@ -733,6 +743,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("unknown-mode".to_string()),
+            None,
             sender,
         )
         .await;
@@ -752,6 +763,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("keyboarding".to_string()),
+            None,
             sender_1,
         )
         .await
@@ -762,6 +774,7 @@ mod tests {
             Some("Bob".to_string()),
             Some(room_code.clone()),
             Some("arithmetic".to_string()),
+            None,
             sender_2,
         )
         .await
@@ -783,6 +796,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
+            None,
             sender,
         )
         .await

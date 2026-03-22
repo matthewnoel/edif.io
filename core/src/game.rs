@@ -62,6 +62,7 @@ pub struct RoomState {
     pub round_id: u64,
     pub match_winner: Option<PlayerId>,
     pub match_deadline: Option<Instant>,
+    pub match_duration_secs: u64,
     pub host_player_id: PlayerId,
     pub next_player_id: u64,
 }
@@ -151,6 +152,7 @@ mod tests {
             round_id: 1,
             match_winner: None,
             match_deadline: None,
+            match_duration_secs: 60,
             host_player_id: 1,
             next_player_id: 3,
         }

@@ -18,7 +18,13 @@ export type RoomSnapshot = {
 };
 
 export type ClientMessage =
-	| { type: 'joinOrCreateRoom'; playerName?: string; roomCode?: string; gameMode?: string }
+	| {
+			type: 'joinOrCreateRoom';
+			playerName?: string;
+			roomCode?: string;
+			gameMode?: string;
+			matchDurationSecs?: number;
+	  }
 	| { type: 'rejoinRoom'; rejoinToken: string }
 	| { type: 'inputUpdate'; text: string }
 	| { type: 'submitAttempt'; text: string }
