@@ -237,33 +237,34 @@
 							{/each}
 						</div>
 					{/if}
-				{#if gs.room?.prompt}
-					<div class="input-container" class:disabled={inputDisabled}>
-						<TextInput
-							bind:el={promptInputEl}
-							value={gs.promptInput}
-							oninput={(e) => handlePromptInput(e.currentTarget.value)}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' && !inputDisabled) submitPrompt();
-							}}
-							placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
-							autocomplete="off"
-							autocorrect="off"
-							autocapitalize="off"
-							spellcheck="false"
-							disabled={inputDisabled}
-						/>
-					</div>
-					{#if myActiveEffects.length > 0}
-						<div class="active-effects">
-							{#each myActiveEffects as effect (effect.kind)}
-								<div class="effect-badge" class:debuff={effect.disablesInput}>
-									<span>{effect.emoji}</span> {effect.label}
-								</div>
-							{/each}
+					{#if gs.room?.prompt}
+						<div class="input-container" class:disabled={inputDisabled}>
+							<TextInput
+								bind:el={promptInputEl}
+								value={gs.promptInput}
+								oninput={(e) => handlePromptInput(e.currentTarget.value)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' && !inputDisabled) submitPrompt();
+								}}
+								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
+								autocomplete="off"
+								autocorrect="off"
+								autocapitalize="off"
+								spellcheck="false"
+								disabled={inputDisabled}
+							/>
 						</div>
+						{#if myActiveEffects.length > 0}
+							<div class="active-effects">
+								{#each myActiveEffects as effect (effect.kind)}
+									<div class="effect-badge" class:debuff={effect.disablesInput}>
+										<span>{effect.emoji}</span>
+										{effect.label}
+									</div>
+								{/each}
+							</div>
+						{/if}
 					{/if}
-				{/if}
 				</div>
 			{/if}
 			{#if gs.latestRoundSummary}
