@@ -163,4 +163,13 @@
 		margin: 0;
 		font-size: 0.8rem;
 	}
+	.error {
+		background-color: transparent;
+		color: red;
+		padding: 0.5rem;
+		border: 2px solid red;
+		border-radius: 0.5rem;
+		font-size: 0.8rem;
+		margin: 0;
+	}
 </style>
