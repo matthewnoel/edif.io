@@ -475,11 +475,7 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
         room.match_deadline = Some(deadline);
     }
 
-    start_match_timer(
-        state.clone(),
-        room_code.to_string(),
-        duration_secs,
-    );
+    start_match_timer(state.clone(), room_code.to_string(), duration_secs);
 
     let _ = broadcast_room_state(state, room_code).await;
     let _ = ensure_prompt_for_room(state, room_code).await;
