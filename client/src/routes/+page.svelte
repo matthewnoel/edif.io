@@ -99,7 +99,7 @@
 				}}
 				placeholder="ABCD"
 				maxlength={4}
-				pattern={"[A-Z]{4}"}
+				pattern={'[A-Z]{4}'}
 				autocomplete="off"
 				autocorrect="off"
 				autocapitalize="characters"
