@@ -437,6 +437,7 @@
 
 	.active-effects {
 		display: flex;
+		flex-direction: column;
 		gap: 0.35rem;
 		flex-shrink: 0;
 	}
@@ -491,6 +492,7 @@
 		text-align: center;
 		padding: 0.5rem;
 		box-sizing: border-box;
+		text-wrap: nowrap;
 		transition:
 			width 180ms linear,
 			height 180ms linear;
