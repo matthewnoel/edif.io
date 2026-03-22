@@ -230,6 +230,7 @@
 											cy="20"
 											stroke-dasharray={RING_CIRCUMFERENCE}
 											stroke-dashoffset={powerupRingOffsets[i] ?? 0}
+											style:stroke={myColor}
 										/>
 									</svg>
 									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
@@ -421,7 +422,7 @@
 
 	.ring-fg {
 		fill: none;
-		stroke: #3b82f6;
+		stroke: currentColor;
 		stroke-width: 3;
 		stroke-linecap: round;
 		transform: rotate(-90deg);
