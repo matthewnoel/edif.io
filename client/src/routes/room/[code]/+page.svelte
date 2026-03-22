@@ -40,6 +40,7 @@
 	let timerBaseMs = 0;
 	let timerSyncedAt = 0;
 	let powerupRingOffsets = $state<Record<number, number>>({});
+	let promptInputEl: HTMLInputElement | null = $state(null);
 
 	let isFrozen = $derived(
 		(gs.room?.activePowerups ?? []).some(
@@ -73,6 +74,12 @@
 		} else {
 			timerDisplayMs = null;
 			timerBaseMs = 0;
+		}
+	});
+
+	$effect(() => {
+		if (gs.room?.prompt && promptInputEl) {
+			promptInputEl.focus();
 		}
 	});
 
@@ -217,9 +224,10 @@
 							{#if isFrozen}
 								<div class="frozen-overlay">{POWERUP_EMOJI.freezeAllCompetitors} Frozen!</div>
 							{/if}
-							<TextInput
-								value={gs.promptInput}
-								oninput={(e) => handlePromptInput(e.currentTarget.value)}
+						<TextInput
+							bind:el={promptInputEl}
+							value={gs.promptInput}
+							oninput={(e) => handlePromptInput(e.currentTarget.value)}
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && !isFrozen) submitPrompt();
 								}}

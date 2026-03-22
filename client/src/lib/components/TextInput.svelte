@@ -4,9 +4,10 @@
 
 	interface Props extends HTMLInputAttributes {
 		value?: string;
+		el?: HTMLInputElement | null;
 	}
 
-	let { value = $bindable(''), ...rest }: Props = $props();
+	let { value = $bindable(''), el = $bindable(null), ...rest }: Props = $props();
 
 	let accentColor = $state<string | undefined>(undefined);
 
@@ -20,6 +21,7 @@
 </script>
 
 <input
+	bind:this={el}
 	bind:value
 	class="input"
 	style:--accent-color={accentColor}
