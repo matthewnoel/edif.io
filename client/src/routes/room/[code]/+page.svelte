@@ -24,9 +24,26 @@
 	import Button from '$lib/components/Button.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
-	const POWERUP_EMOJI: Record<PowerUpKind, string> = {
-		freezeAllCompetitors: '\u{1F976}',
-		doublePoints: '\u{1F4AA}'
+	type PowerUpMeta = {
+		emoji: string;
+		label: string;
+		affectsSelf: boolean;
+		disablesInput: boolean;
+	};
+
+	const POWERUP_META: Record<PowerUpKind, PowerUpMeta> = {
+		freezeAllCompetitors: {
+			emoji: '\u{1F976}',
+			label: 'Frozen!',
+			affectsSelf: false,
+			disablesInput: true
+		},
+		doublePoints: {
+			emoji: '\u{1F4AA}',
+			label: '2x Points',
+			affectsSelf: true,
+			disablesInput: false
+		}
 	};
 
 	const RING_CIRCUMFERENCE = 106.81;
@@ -42,17 +59,18 @@
 	let powerupRingOffsets = $state<Record<number, number>>({});
 	let promptInputEl: HTMLInputElement | null = $state(null);
 
-	let isFrozen = $derived(
-		(gs.room?.activePowerups ?? []).some(
-			(pu) => pu.kind === 'freezeAllCompetitors' && pu.sourcePlayerId !== gs.playerId
-		)
+	let myActiveEffects = $derived(
+		(gs.room?.activePowerups ?? [])
+			.filter((pu) => {
+				const meta = POWERUP_META[pu.kind];
+				return meta.affectsSelf
+					? pu.sourcePlayerId === gs.playerId
+					: pu.sourcePlayerId !== gs.playerId;
+			})
+			.map((pu) => ({ ...POWERUP_META[pu.kind], kind: pu.kind }))
 	);
 
-	let myDoublePoints = $derived(
-		(gs.room?.activePowerups ?? []).some(
-			(pu) => pu.kind === 'doublePoints' && pu.sourcePlayerId === gs.playerId
-		)
-	);
+	let inputDisabled = $derived(myActiveEffects.some((e) => e.disablesInput));
 
 	let myColor = $derived(gs.room?.players.find((p) => p.id === gs.playerId)?.color ?? null);
 
@@ -214,35 +232,38 @@
 											stroke-dashoffset={powerupRingOffsets[i] ?? 0}
 										/>
 									</svg>
-									<span class="powerup-emoji">{POWERUP_EMOJI[pu.kind]}</span>
+									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
 								</div>
 							{/each}
 						</div>
 					{/if}
-					{#if gs.room?.prompt}
-						<div class="input-container" class:frozen={isFrozen}>
-							{#if isFrozen}
-								<div class="frozen-overlay">{POWERUP_EMOJI.freezeAllCompetitors} Frozen!</div>
-							{/if}
-							<TextInput
-								bind:el={promptInputEl}
-								value={gs.promptInput}
-								oninput={(e) => handlePromptInput(e.currentTarget.value)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' && !isFrozen) submitPrompt();
-								}}
-								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
-								autocomplete="off"
-								autocorrect="off"
-								autocapitalize="off"
-								spellcheck="false"
-								disabled={isFrozen}
-							/>
+				{#if gs.room?.prompt}
+					<div class="input-container" class:disabled={inputDisabled}>
+						<TextInput
+							bind:el={promptInputEl}
+							value={gs.promptInput}
+							oninput={(e) => handlePromptInput(e.currentTarget.value)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' && !inputDisabled) submitPrompt();
+							}}
+							placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
+							autocomplete="off"
+							autocorrect="off"
+							autocapitalize="off"
+							spellcheck="false"
+							disabled={inputDisabled}
+						/>
+					</div>
+					{#if myActiveEffects.length > 0}
+						<div class="active-effects">
+							{#each myActiveEffects as effect (effect.kind)}
+								<div class="effect-badge" class:debuff={effect.disablesInput}>
+									<span>{effect.emoji}</span> {effect.label}
+								</div>
+							{/each}
 						</div>
-						{#if myDoublePoints}
-							<div class="powerup-badge double">{POWERUP_EMOJI.doublePoints} 2x</div>
-						{/if}
 					{/if}
+				{/if}
 				</div>
 			{/if}
 			{#if gs.latestRoundSummary}
@@ -365,21 +386,8 @@
 		min-width: 0;
 	}
 
-	.input-container.frozen {
+	.input-container.disabled {
 		opacity: 0.5;
-		pointer-events: none;
-	}
-
-	.frozen-overlay {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1rem;
-		font-weight: 700;
-		color: #60a5fa;
-		z-index: 1;
 		pointer-events: none;
 	}
 
@@ -425,14 +433,24 @@
 		z-index: 1;
 	}
 
-	.powerup-badge {
+	.active-effects {
+		display: flex;
+		gap: 0.35rem;
 		flex-shrink: 0;
+	}
+
+	.effect-badge {
 		font-size: 0.9rem;
 		font-weight: 700;
 		padding: 0.25rem 0.5rem;
 		border-radius: 0.4rem;
 		background: #fef3c7;
 		color: #92400e;
+	}
+
+	.effect-badge.debuff {
+		background: #dbeafe;
+		color: #1e40af;
 	}
 
 	.game-over-container {
