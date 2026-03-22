@@ -133,20 +133,27 @@
 				<div class="timer">{formatTimer(timerDisplayMs)}</div>
 			{/if}
 			<div class="prompt"><strong>{gs.room?.prompt ?? 'Waiting for prompt...'}</strong></div>
-			<div class="input-container">
-				<TextInput
-					value={gs.promptInput}
-					oninput={(e) => handlePromptInput(e.currentTarget.value)}
-					onkeydown={(e) => {
-						if (e.key === 'Enter') submitPrompt();
-					}}
-					placeholder="Type your answer, press Enter to submit"
-					autocomplete="off"
-					autocorrect="off"
-					autocapitalize="off"
-					spellcheck="false"
-				/>
-			</div>
+			{#if gs.room?.matchWinner}
+				<div class="game-over-container">
+					<h1 class="shizuru-regular">Game Over</h1>
+					<Button label="Home" onclick={leaveRoom} />
+				</div>
+			{:else}
+				<div class="input-container">
+					<TextInput
+						value={gs.promptInput}
+						oninput={(e) => handlePromptInput(e.currentTarget.value)}
+						onkeydown={(e) => {
+							if (e.key === 'Enter') submitPrompt();
+						}}
+						placeholder="Type your answer, press Enter to submit"
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
+						spellcheck="false"
+					/>
+				</div>
+			{/if}
 			{#if gs.latestRoundSummary}
 				<div class="result" style:color={gs.latestRoundSummaryColor || null}>
 					{gs.latestRoundSummary}
@@ -256,6 +263,18 @@
 		margin: 0 auto;
 		width: 100%;
 		max-width: 400px;
+	}
+
+	.game-over-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.game-over-container h1 {
+		font-size: 5rem;
+		margin-bottom: 1rem;
 	}
 
 	.result {
