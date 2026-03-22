@@ -1,3 +1,11 @@
+export type PowerUpKind = 'freezeAllCompetitors' | 'doublePoints';
+
+export type ActivePowerUpSnapshot = {
+	kind: PowerUpKind;
+	sourcePlayerId: number;
+	remainingMs: number;
+};
+
 export type PlayerSnapshot = {
 	id: number;
 	name: string;
@@ -15,6 +23,7 @@ export type RoomSnapshot = {
 	matchWinner: number | null;
 	matchRemainingMs: number | null;
 	hostPlayerId: number;
+	activePowerups: ActivePowerUpSnapshot[];
 };
 
 export type ClientMessage =
@@ -51,10 +60,29 @@ export type ServerMessage =
 			growthAwarded: number;
 	  }
 	| { type: 'wrongAnswer'; roomCode: string; playerId: number; shrinkApplied: number }
-	| { type: 'error'; message: string };
+	| { type: 'error'; message: string }
+	| { type: 'powerUpOffered'; kind: PowerUpKind; expiresInMs: number }
+	| { type: 'powerUpActivated'; playerId: number; kind: PowerUpKind; durationMs: number }
+	| { type: 'powerUpOfferExpired'; kind: PowerUpKind }
+	| { type: 'powerUpEffectEnded'; playerId: number; kind: PowerUpKind };
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
+}
+
+const VALID_POWERUP_KINDS: PowerUpKind[] = ['freezeAllCompetitors', 'doublePoints'];
+
+function isPowerUpKind(value: unknown): value is PowerUpKind {
+	return typeof value === 'string' && VALID_POWERUP_KINDS.includes(value as PowerUpKind);
+}
+
+function isActivePowerUpSnapshot(value: unknown): value is ActivePowerUpSnapshot {
+	if (!isObject(value)) return false;
+	return (
+		isPowerUpKind(value.kind) &&
+		typeof value.sourcePlayerId === 'number' &&
+		typeof value.remainingMs === 'number'
+	);
 }
 
 function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
@@ -78,7 +106,9 @@ function isRoomSnapshot(value: unknown): value is RoomSnapshot {
 		(value.matchWinner === null || typeof value.matchWinner === 'number') &&
 		(value.matchRemainingMs === null || typeof value.matchRemainingMs === 'number') &&
 		typeof value.hostPlayerId === 'number' &&
-		value.players.every(isPlayerSnapshot)
+		value.players.every(isPlayerSnapshot) &&
+		Array.isArray(value.activePowerups) &&
+		value.activePowerups.every(isActivePowerUpSnapshot)
 	);
 }
 
@@ -124,6 +154,18 @@ function isServerMessage(value: unknown): value is ServerMessage {
 			);
 		case 'error':
 			return typeof value.message === 'string';
+		case 'powerUpOffered':
+			return isPowerUpKind(value.kind) && typeof value.expiresInMs === 'number';
+		case 'powerUpActivated':
+			return (
+				typeof value.playerId === 'number' &&
+				isPowerUpKind(value.kind) &&
+				typeof value.durationMs === 'number'
+			);
+		case 'powerUpOfferExpired':
+			return isPowerUpKind(value.kind);
+		case 'powerUpEffectEnded':
+			return typeof value.playerId === 'number' && isPowerUpKind(value.kind);
 		default:
 			return false;
 	}

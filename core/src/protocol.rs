@@ -1,4 +1,5 @@
 use crate::game::{PlayerId, RoomSnapshot};
+use crate::powerup::PowerUpKind;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -81,6 +82,26 @@ pub enum ServerMessage {
     Error {
         message: String,
     },
+    PowerUpOffered {
+        kind: PowerUpKind,
+        #[serde(rename = "expiresInMs")]
+        expires_in_ms: u64,
+    },
+    PowerUpActivated {
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        kind: PowerUpKind,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+    },
+    PowerUpOfferExpired {
+        kind: PowerUpKind,
+    },
+    PowerUpEffectEnded {
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        kind: PowerUpKind,
+    },
 }
 
 #[cfg(test)]
@@ -126,5 +147,53 @@ mod tests {
         assert!(json.contains(r#""roomCode":"ABCD""#));
         assert!(json.contains(r#""playerId":1"#));
         assert!(json.contains(r#""shrinkApplied":2.0"#));
+    }
+
+    #[test]
+    fn serializes_powerup_offered() {
+        let msg = super::ServerMessage::PowerUpOffered {
+            kind: super::PowerUpKind::FreezeAllCompetitors,
+            expires_in_ms: 30000,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpOffered""#));
+        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+        assert!(json.contains(r#""expiresInMs":30000"#));
+    }
+
+    #[test]
+    fn serializes_powerup_activated() {
+        let msg = super::ServerMessage::PowerUpActivated {
+            player_id: 2,
+            kind: super::PowerUpKind::DoublePoints,
+            duration_ms: 30000,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpActivated""#));
+        assert!(json.contains(r#""playerId":2"#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
+        assert!(json.contains(r#""durationMs":30000"#));
+    }
+
+    #[test]
+    fn serializes_powerup_offer_expired() {
+        let msg = super::ServerMessage::PowerUpOfferExpired {
+            kind: super::PowerUpKind::DoublePoints,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpOfferExpired""#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
+    }
+
+    #[test]
+    fn serializes_powerup_effect_ended() {
+        let msg = super::ServerMessage::PowerUpEffectEnded {
+            player_id: 1,
+            kind: super::PowerUpKind::FreezeAllCompetitors,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpEffectEnded""#));
+        assert!(json.contains(r#""playerId":1"#));
+        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
     }
 }

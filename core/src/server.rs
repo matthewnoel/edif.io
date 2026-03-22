@@ -3,6 +3,11 @@ use crate::game::{
     DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
     apply_wrong_answer_penalty, resolve_match_by_timer,
 };
+use crate::powerup::{
+    ActivePowerUp, PowerUpOffer, cleanup_expired, effect_duration, has_double_points,
+    is_player_frozen, offer_duration, pick_powerup_kind, pick_powerup_recipient,
+    DISTRIBUTION_INTERVAL_SECS,
+};
 use crate::protocol::{ClientMessage, ServerMessage};
 use axum::Router;
 use axum::extract::State;
@@ -357,6 +362,8 @@ async fn join_or_create_room(
                     match_duration_secs: duration,
                     host_player_id: 1,
                     next_player_id: 1,
+                    powerup_offers: Vec::new(),
+                    active_powerups: Vec::new(),
                 },
             );
             generated
@@ -437,6 +444,7 @@ async fn handle_submission(
     let mut should_advance_round = false;
     let mut round_result: Option<ServerMessage> = None;
     let mut wrong_answer_msg: Option<ServerMessage> = None;
+    let mut earned_powerups: Vec<ServerMessage> = Vec::new();
 
     {
         let mut rooms = state.rooms.lock().await;
@@ -445,6 +453,10 @@ async fn handle_submission(
         };
 
         if room.match_winner.is_some() || room.prompt.is_empty() {
+            return;
+        }
+
+        if is_player_frozen(&room.active_powerups, player_id) {
             return;
         }
 
@@ -459,9 +471,14 @@ async fn handle_submission(
             }
         } else {
             let configured_growth = state.config.growth_per_round_win;
-            let growth = adapter
+            let mut growth = adapter
                 .score_for_prompt(&room.prompt)
                 .max(configured_growth);
+
+            if has_double_points(&room.active_powerups, player_id) {
+                growth *= 2.0;
+            }
+
             if let Some(resolution) = apply_round_win(room, player_id, growth) {
                 round_result = Some(ServerMessage::RoundResult {
                     room_code: room_code.to_string(),
@@ -470,6 +487,29 @@ async fn handle_submission(
                     growth_awarded: growth,
                 });
                 should_advance_round = room.match_winner.is_none();
+
+                let now = Instant::now();
+                let mut i = 0;
+                while i < room.powerup_offers.len() {
+                    if room.powerup_offers[i].player_id == player_id
+                        && room.powerup_offers[i].expires_at > now
+                    {
+                        let offer = room.powerup_offers.swap_remove(i);
+                        let duration = effect_duration(offer.kind);
+                        room.active_powerups.push(ActivePowerUp {
+                            kind: offer.kind,
+                            source_player_id: player_id,
+                            expires_at: now + duration,
+                        });
+                        earned_powerups.push(ServerMessage::PowerUpActivated {
+                            player_id,
+                            kind: offer.kind,
+                            duration_ms: duration.as_millis() as u64,
+                        });
+                    } else {
+                        i += 1;
+                    }
+                }
             }
         }
     }
@@ -480,8 +520,16 @@ async fn handle_submission(
         return;
     }
 
+    let had_round_result = round_result.is_some();
     if let Some(msg) = round_result {
         let _ = broadcast_to_room(state, room_code, &msg).await;
+    }
+
+    for msg in &earned_powerups {
+        let _ = broadcast_to_room(state, room_code, msg).await;
+    }
+
+    if had_round_result || !earned_powerups.is_empty() {
         let _ = broadcast_room_state(state, room_code).await;
     }
 
@@ -506,6 +554,7 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
     }
 
     start_match_timer(state.clone(), room_code.to_string(), duration_secs);
+    start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
 
     let _ = broadcast_room_state(state, room_code).await;
     let _ = ensure_prompt_for_room(state, room_code).await;
@@ -528,6 +577,7 @@ async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
     }
 
     start_match_timer(state.clone(), room_code.to_string(), duration_secs);
+    start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
 
     let _ = broadcast_room_state(state, room_code).await;
     let _ = ensure_prompt_for_room(state, room_code).await;
@@ -582,6 +632,106 @@ fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: 
         }
         let _ = broadcast_room_state(&state, &room_code).await;
     });
+}
+
+fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duration_secs: u64) {
+    tokio::spawn(async move {
+        let match_end = Instant::now() + Duration::from_secs(match_duration_secs);
+        loop {
+            tokio::time::sleep(Duration::from_secs(DISTRIBUTION_INTERVAL_SECS)).await;
+
+            let now = Instant::now();
+            if now >= match_end {
+                break;
+            }
+
+            let mut expired_offer_notifs: Vec<(PlayerId, ServerMessage)> = Vec::new();
+            let mut expired_effect_broadcasts: Vec<ServerMessage> = Vec::new();
+            let mut new_offer_notif: Option<(PlayerId, ServerMessage)> = None;
+
+            {
+                let mut rooms = state.rooms.lock().await;
+                let Some(room) = rooms.get_mut(&room_code) else {
+                    break;
+                };
+                if room.match_winner.is_some() {
+                    break;
+                }
+
+                let expired =
+                    cleanup_expired(&mut room.powerup_offers, &mut room.active_powerups, now);
+
+                for offer in &expired.expired_offers {
+                    expired_offer_notifs.push((
+                        offer.player_id,
+                        ServerMessage::PowerUpOfferExpired { kind: offer.kind },
+                    ));
+                }
+                for effect in &expired.expired_effects {
+                    expired_effect_broadcasts.push(ServerMessage::PowerUpEffectEnded {
+                        player_id: effect.source_player_id,
+                        kind: effect.kind,
+                    });
+                }
+
+                let players: Vec<(PlayerId, f32)> = room
+                    .players
+                    .values()
+                    .filter(|p| p.connected)
+                    .map(|p| (p.id, p.size))
+                    .collect();
+
+                let mut rng = rand::rng();
+                if let Some(recipient) = pick_powerup_recipient(&players, &mut rng) {
+                    let kind = pick_powerup_kind(&mut rng);
+                    let expires_at = now + offer_duration();
+                    room.powerup_offers.push(PowerUpOffer {
+                        kind,
+                        player_id: recipient,
+                        expires_at,
+                    });
+                    let expires_in_ms = offer_duration().as_millis() as u64;
+                    new_offer_notif = Some((
+                        recipient,
+                        ServerMessage::PowerUpOffered {
+                            kind,
+                            expires_in_ms,
+                        },
+                    ));
+                }
+            }
+
+            for (player_id, msg) in expired_offer_notifs {
+                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            }
+            let had_expired_effects = !expired_effect_broadcasts.is_empty();
+            for msg in expired_effect_broadcasts {
+                let _ = broadcast_to_room(&state, &room_code, &msg).await;
+            }
+            if had_expired_effects {
+                let _ = broadcast_room_state(&state, &room_code).await;
+            }
+            if let Some((player_id, msg)) = new_offer_notif {
+                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            }
+        }
+    });
+}
+
+async fn send_to_player(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+    message: &ServerMessage,
+) -> bool {
+    let connections = state.connections.lock().await;
+    let Some(room_connections) = connections.get(room_code) else {
+        return false;
+    };
+    let Some(conn) = room_connections.get(&player_id) else {
+        return false;
+    };
+    send_server_message(&conn.sender, message).is_ok()
 }
 
 async fn disconnect_player(state: &Arc<SharedState>, room_code: &str, player_id: PlayerId) {
@@ -871,5 +1021,141 @@ mod tests {
             .and_then(|room| room.players.get(&pid))
             .expect("player exists");
         assert_eq!(player.size, DEFAULT_START_SIZE + 9.0);
+    }
+
+    #[tokio::test]
+    async fn frozen_player_cannot_submit() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, pid) = join_or_create_room(
+            &state,
+            Some("Alice".to_string()),
+            None,
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
+
+        handle_start_match(&state, &room_code, pid).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room exists");
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                source_player_id: 999,
+                expires_at: Instant::now() + Duration::from_secs(15),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room exists").prompt.clone()
+        };
+        handle_submission(&state, &room_code, pid, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let player = rooms
+            .get(&room_code)
+            .and_then(|r| r.players.get(&pid))
+            .expect("player exists");
+        assert_eq!(player.size, DEFAULT_START_SIZE, "frozen player should not gain points");
+    }
+
+    #[tokio::test]
+    async fn double_points_doubles_growth() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, pid) = join_or_create_room(
+            &state,
+            Some("Alice".to_string()),
+            None,
+            Some("arithmetic".to_string()),
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
+
+        handle_start_match(&state, &room_code, pid).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room exists");
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::DoublePoints,
+                source_player_id: pid,
+                expires_at: Instant::now() + Duration::from_secs(30),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room exists").prompt.clone()
+        };
+        handle_submission(&state, &room_code, pid, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let player = rooms
+            .get(&room_code)
+            .and_then(|r| r.players.get(&pid))
+            .expect("player exists");
+        assert_eq!(
+            player.size,
+            DEFAULT_START_SIZE + 9.0 * 2.0,
+            "growth should be doubled with double-points active"
+        );
+    }
+
+    #[tokio::test]
+    async fn winning_round_earns_pending_powerup() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, pid) = join_or_create_room(
+            &state,
+            Some("Alice".to_string()),
+            None,
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
+
+        handle_start_match(&state, &room_code, pid).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room exists");
+            room.powerup_offers.push(PowerUpOffer {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                player_id: pid,
+                expires_at: Instant::now() + Duration::from_secs(30),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room exists").prompt.clone()
+        };
+        handle_submission(&state, &room_code, pid, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room exists");
+        assert!(room.powerup_offers.is_empty(), "offer should be consumed");
+        assert_eq!(room.active_powerups.len(), 1, "one active power-up");
+        assert_eq!(
+            room.active_powerups[0].kind,
+            PowerUpKind::FreezeAllCompetitors
+        );
+        assert_eq!(room.active_powerups[0].source_player_id, pid);
     }
 }

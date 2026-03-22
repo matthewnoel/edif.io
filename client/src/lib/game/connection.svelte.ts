@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import {
 	decodeServerMessage,
 	type ClientMessage,
+	type PowerUpKind,
 	type RoomSnapshot,
 	type ServerMessage
 } from './protocol';
@@ -55,6 +56,8 @@ function normalizeRoomCode(value: string): string {
 	return value.trim().toUpperCase();
 }
 
+export type PendingPowerUp = { kind: PowerUpKind; expiresAt: number };
+
 export const gs = $state({
 	phase: 'pregame' as ConnectionPhase,
 	playerId: null as number | null,
@@ -69,7 +72,8 @@ export const gs = $state({
 	inboundCount: 0,
 	outboundCount: 0,
 	socketState: 'idle',
-	lastSocketDetail: ''
+	lastSocketDetail: '',
+	pendingPowerUps: [] as PendingPowerUp[]
 });
 
 let socket: WebSocket | null = null;
@@ -155,6 +159,22 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		case 'error':
 			gs.errorMessage = message.message;
+			break;
+		case 'powerUpOffered':
+			gs.pendingPowerUps = [
+				...gs.pendingPowerUps,
+				{ kind: message.kind, expiresAt: performance.now() + message.expiresInMs }
+			];
+			break;
+		case 'powerUpOfferExpired':
+			gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.kind !== message.kind);
+			break;
+		case 'powerUpActivated':
+			if (message.playerId === gs.playerId) {
+				gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.kind !== message.kind);
+			}
+			break;
+		case 'powerUpEffectEnded':
 			break;
 	}
 }
@@ -267,5 +287,6 @@ export function rematch(): void {
 	gs.latestRoundSummary = '';
 	gs.latestRoundSummaryColor = '';
 	gs.promptInput = '';
+	gs.pendingPowerUps = [];
 	sendClientMessage({ type: 'rematch' });
 }

@@ -1,3 +1,4 @@
+use crate::powerup::{ActivePowerUp, ActivePowerUpSnapshot, PowerUpOffer};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -52,6 +53,7 @@ pub struct RoomSnapshot {
     pub match_winner: Option<PlayerId>,
     pub match_remaining_ms: Option<u64>,
     pub host_player_id: PlayerId,
+    pub active_powerups: Vec<ActivePowerUpSnapshot>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +68,8 @@ pub struct RoomState {
     pub match_duration_secs: u64,
     pub host_player_id: PlayerId,
     pub next_player_id: u64,
+    pub powerup_offers: Vec<PowerUpOffer>,
+    pub active_powerups: Vec<ActivePowerUp>,
 }
 
 impl RoomState {
@@ -74,6 +78,8 @@ impl RoomState {
         self.match_deadline = None;
         self.prompt.clear();
         self.round_id = 0;
+        self.powerup_offers.clear();
+        self.active_powerups.clear();
         for player in self.players.values_mut() {
             player.size = DEFAULT_START_SIZE;
             player.progress.clear();
@@ -94,6 +100,12 @@ impl RoomState {
                 .as_millis() as u64
         });
 
+        let active_powerups = self
+            .active_powerups
+            .iter()
+            .map(ActivePowerUp::to_snapshot)
+            .collect();
+
         RoomSnapshot {
             room_code: self.room_code.clone(),
             players,
@@ -102,6 +114,7 @@ impl RoomState {
             match_winner: self.match_winner,
             match_remaining_ms,
             host_player_id: self.host_player_id,
+            active_powerups,
         }
     }
 }
@@ -179,6 +192,8 @@ mod tests {
             match_duration_secs: 60,
             host_player_id: 1,
             next_player_id: 3,
+            powerup_offers: Vec::new(),
+            active_powerups: Vec::new(),
         }
     }
 
@@ -226,6 +241,8 @@ mod tests {
 
     #[test]
     fn reset_for_rematch_clears_match_state() {
+        use crate::powerup::{ActivePowerUp, PowerUpKind, PowerUpOffer};
+
         let mut room = test_room();
         room.match_winner = Some(1);
         room.match_deadline = Some(Instant::now());
@@ -234,12 +251,24 @@ mod tests {
         room.players.get_mut(&1).unwrap().size = 30.0;
         room.players.get_mut(&2).unwrap().size = 20.0;
         room.players.get_mut(&1).unwrap().progress = "partial".to_string();
+        room.powerup_offers.push(PowerUpOffer {
+            kind: PowerUpKind::DoublePoints,
+            player_id: 2,
+            expires_at: Instant::now(),
+        });
+        room.active_powerups.push(ActivePowerUp {
+            kind: PowerUpKind::FreezeAllCompetitors,
+            source_player_id: 1,
+            expires_at: Instant::now(),
+        });
 
         room.reset_for_rematch();
 
         assert_eq!(room.match_winner, None);
         assert!(room.match_deadline.is_none());
         assert!(room.prompt.is_empty());
+        assert!(room.powerup_offers.is_empty());
+        assert!(room.active_powerups.is_empty());
         assert_eq!(room.round_id, 0);
         assert_eq!(room.players.len(), 2);
         assert_eq!(room.players.get(&1).unwrap().size, DEFAULT_START_SIZE);
