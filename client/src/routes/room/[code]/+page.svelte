@@ -58,6 +58,8 @@
 	let timerSyncedAt = 0;
 	let powerupRingOffsets = $state<Record<number, number>>({});
 	let promptInputEl: HTMLInputElement | null = $state(null);
+	let copyConfirmed = $state(false);
+	let copyTimeout = 0;
 
 	let myActiveEffects = $derived(
 		(gs.room?.activePowerups ?? [])
@@ -152,6 +154,9 @@
 
 	function copyRoomLink(): void {
 		navigator.clipboard.writeText(window.location.href);
+		clearTimeout(copyTimeout);
+		copyConfirmed = true;
+		copyTimeout = window.setTimeout(() => (copyConfirmed = false), 1500);
 	}
 
 	onMount(() => {
@@ -291,6 +296,9 @@
 	</div>
 	{#if gs.room?.roomCode}
 		<div class="room">
+			{#if copyConfirmed}
+				<span class="copy-toast"><strong>LINK COPIED</strong></span>
+			{/if}
 			<input
 				type="button"
 				class="shizuru-regular"
@@ -548,6 +556,28 @@
 		right: 0.5rem;
 		z-index: 3;
 		text-align: center;
+	}
+
+	.copy-toast {
+		display: block;
+		animation: fade-in-out 1.5s ease forwards;
+	}
+
+	@keyframes fade-in-out {
+		0% {
+			opacity: 0;
+			translate: 0 4px;
+		}
+		15% {
+			opacity: 1;
+			translate: 0 0;
+		}
+		75% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+		}
 	}
 
 	.room input[type='button'] {
