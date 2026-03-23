@@ -45,6 +45,10 @@
 			gs.errorMessage = 'Enter a room code to join';
 			return;
 		}
+		if (code.length < 4) {
+			gs.errorMessage = 'Room codes are 4 letters';
+			return;
+		}
 		connect(wsUrl, {
 			roomCode: code,
 			playerName,

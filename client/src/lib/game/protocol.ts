@@ -1,3 +1,11 @@
+export type ErrorCode =
+	| 'roomNotFound'
+	| 'invalidGameMode'
+	| 'invalidMessageFormat'
+	| 'invalidRejoinToken'
+	| 'roomExpired'
+	| 'playerNotInRoom';
+
 export type PowerUpKind = 'freezeAllCompetitors' | 'doublePoints';
 
 export type ActivePowerUpSnapshot = {
@@ -60,7 +68,7 @@ export type ServerMessage =
 			growthAwarded: number;
 	  }
 	| { type: 'wrongAnswer'; roomCode: string; playerId: number; shrinkApplied: number }
-	| { type: 'error'; message: string }
+	| { type: 'error'; message: string; code?: ErrorCode }
 	| { type: 'powerUpOffered'; kind: PowerUpKind; expiresInMs: number }
 	| { type: 'powerUpActivated'; playerId: number; kind: PowerUpKind; durationMs: number }
 	| { type: 'powerUpOfferExpired'; kind: PowerUpKind }
@@ -68,6 +76,19 @@ export type ServerMessage =
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
+}
+
+const VALID_ERROR_CODES: ErrorCode[] = [
+	'roomNotFound',
+	'invalidGameMode',
+	'invalidMessageFormat',
+	'invalidRejoinToken',
+	'roomExpired',
+	'playerNotInRoom'
+];
+
+function isErrorCode(value: unknown): value is ErrorCode {
+	return typeof value === 'string' && VALID_ERROR_CODES.includes(value as ErrorCode);
 }
 
 const VALID_POWERUP_KINDS: PowerUpKind[] = ['freezeAllCompetitors', 'doublePoints'];
@@ -153,7 +174,9 @@ function isServerMessage(value: unknown): value is ServerMessage {
 				typeof value.shrinkApplied === 'number'
 			);
 		case 'error':
-			return typeof value.message === 'string';
+			return (
+				typeof value.message === 'string' && (value.code === undefined || isErrorCode(value.code))
+			);
 		case 'powerUpOffered':
 			return isPowerUpKind(value.kind) && typeof value.expiresInMs === 'number';
 		case 'powerUpActivated':

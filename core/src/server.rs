@@ -7,7 +7,7 @@ use crate::powerup::{
     ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpOffer, cleanup_expired, effect_duration,
     has_double_points, is_player_frozen, offer_duration, pick_powerup_kind, pick_powerup_recipient,
 };
-use crate::protocol::{ClientMessage, ServerMessage};
+use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
 use axum::Router;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -127,6 +127,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     &client_tx,
                     &ServerMessage::Error {
                         message: "Invalid message format".to_string(),
+                        code: Some(ErrorCode::InvalidMessageFormat),
                     },
                 );
                 continue;
@@ -154,39 +155,52 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                 )
                 .await;
 
-                if let Some((code, token, assigned_player_id)) = result {
-                    player_id = Some(assigned_player_id);
-                    room_code = Some(code.clone());
+                match result {
+                    Ok((code, token, assigned_player_id)) => {
+                        player_id = Some(assigned_player_id);
+                        room_code = Some(code.clone());
 
-                    {
-                        let mut tokens = state.rejoin_tokens.lock().await;
-                        tokens.insert(token.clone(), (code.clone(), assigned_player_id));
+                        {
+                            let mut tokens = state.rejoin_tokens.lock().await;
+                            tokens.insert(token.clone(), (code.clone(), assigned_player_id));
+                        }
+
+                        let adapter = adapter_for_room(&state, &code).await;
+                        let _ = send_server_message(
+                            &client_tx,
+                            &ServerMessage::Welcome {
+                                player_id: assigned_player_id,
+                                room_code: code.clone(),
+                                game_key: room_game_key(&state, &code)
+                                    .await
+                                    .unwrap_or_else(|| state.default_game_key.clone()),
+                                input_placeholder: adapter
+                                    .map(|a| a.input_placeholder().to_string())
+                                    .unwrap_or_default(),
+                                rejoin_token: token,
+                            },
+                        );
+
+                        let _ = broadcast_room_state(&state, &code).await;
                     }
-
-                    let adapter = adapter_for_room(&state, &code).await;
-                    let _ = send_server_message(
-                        &client_tx,
-                        &ServerMessage::Welcome {
-                            player_id: assigned_player_id,
-                            room_code: code.clone(),
-                            game_key: room_game_key(&state, &code)
-                                .await
-                                .unwrap_or_else(|| state.default_game_key.clone()),
-                            input_placeholder: adapter
-                                .map(|a| a.input_placeholder().to_string())
-                                .unwrap_or_default(),
-                            rejoin_token: token,
-                        },
-                    );
-
-                    let _ = broadcast_room_state(&state, &code).await;
-                } else {
-                    let _ = send_server_message(
-                        &client_tx,
-                        &ServerMessage::Error {
-                            message: "Unable to join room".to_string(),
-                        },
-                    );
+                    Err(JoinError::RoomNotFound(code)) => {
+                        let _ = send_server_message(
+                            &client_tx,
+                            &ServerMessage::Error {
+                                message: format!("No room found with code {code}"),
+                                code: Some(ErrorCode::RoomNotFound),
+                            },
+                        );
+                    }
+                    Err(JoinError::InvalidGameMode(mode)) => {
+                        let _ = send_server_message(
+                            &client_tx,
+                            &ServerMessage::Error {
+                                message: format!("Game mode '{mode}' is not available"),
+                                code: Some(ErrorCode::InvalidGameMode),
+                            },
+                        );
+                    }
                 }
             }
             ClientMessage::RejoinRoom { rejoin_token } => {
@@ -203,7 +217,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     let _ = send_server_message(
                         &client_tx,
                         &ServerMessage::Error {
-                            message: "Invalid rejoin token".to_string(),
+                            message: "Session expired — please rejoin the room".to_string(),
+                            code: Some(ErrorCode::InvalidRejoinToken),
                         },
                     );
                     continue;
@@ -218,6 +233,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                             &client_tx,
                             &ServerMessage::Error {
                                 message: "Room no longer exists".to_string(),
+                                code: Some(ErrorCode::RoomExpired),
                             },
                         );
                         continue;
@@ -229,6 +245,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                             &client_tx,
                             &ServerMessage::Error {
                                 message: "Player no longer in room".to_string(),
+                                code: Some(ErrorCode::PlayerNotInRoom),
                             },
                         );
                         continue;
@@ -314,6 +331,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
     writer_task.abort();
 }
 
+#[derive(Debug)]
+enum JoinError {
+    RoomNotFound(String),
+    InvalidGameMode(String),
+}
+
 async fn join_or_create_room(
     state: &Arc<SharedState>,
     player_name: Option<String>,
@@ -321,14 +344,14 @@ async fn join_or_create_room(
     requested_game_mode: Option<String>,
     requested_match_duration_secs: Option<u64>,
     sender: mpsc::UnboundedSender<Message>,
-) -> Option<(String, String, PlayerId)> {
+) -> Result<(String, String, PlayerId), JoinError> {
     let token = generate_rejoin_token();
     let mut rooms = state.rooms.lock().await;
     let mut connections = state.connections.lock().await;
 
     let room_code = match requested_room_code {
         Some(code) if rooms.contains_key(&code) => code,
-        Some(_) => return None,
+        Some(code) => return Err(JoinError::RoomNotFound(code)),
         None => {
             let requested = requested_game_mode
                 .as_deref()
@@ -339,7 +362,7 @@ async fn join_or_create_room(
                     if state.adapters.contains_key(game_key) {
                         game_key.to_string()
                     } else {
-                        return None;
+                        return Err(JoinError::InvalidGameMode(game_key.to_string()));
                     }
                 }
                 None => state.default_game_key.clone(),
@@ -369,7 +392,9 @@ async fn join_or_create_room(
         }
     };
 
-    let room = rooms.get_mut(&room_code)?;
+    let room = rooms
+        .get_mut(&room_code)
+        .expect("room was just verified or inserted");
 
     let player_id = room.next_player_id;
     room.next_player_id += 1;
@@ -394,7 +419,7 @@ async fn join_or_create_room(
         .or_default()
         .insert(player_id, RoomConnection { sender });
 
-    Some((room_code, token, player_id))
+    Ok((room_code, token, player_id))
 }
 
 async fn handle_progress_update(
@@ -954,7 +979,7 @@ mod tests {
         )
         .await;
 
-        assert!(result.is_none());
+        assert!(result.is_err());
         assert!(state.rooms.lock().await.is_empty());
     }
 

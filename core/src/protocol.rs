@@ -2,6 +2,17 @@ use crate::game::{PlayerId, RoomSnapshot};
 use crate::powerup::PowerUpKind;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorCode {
+    RoomNotFound,
+    InvalidGameMode,
+    InvalidMessageFormat,
+    InvalidRejoinToken,
+    RoomExpired,
+    PlayerNotInRoom,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ClientMessage {
@@ -81,6 +92,8 @@ pub enum ServerMessage {
     },
     Error {
         message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<ErrorCode>,
     },
     PowerUpOffered {
         kind: PowerUpKind,
@@ -195,5 +208,29 @@ mod tests {
         assert!(json.contains(r#""type":"powerUpEffectEnded""#));
         assert!(json.contains(r#""playerId":1"#));
         assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+    }
+
+    #[test]
+    fn serializes_error_with_code() {
+        let msg = super::ServerMessage::Error {
+            message: "No room found with code ZZZZ".to_string(),
+            code: Some(super::ErrorCode::RoomNotFound),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"error""#));
+        assert!(json.contains(r#""message":"No room found with code ZZZZ""#));
+        assert!(json.contains(r#""code":"roomNotFound""#));
+    }
+
+    #[test]
+    fn serializes_error_without_code() {
+        let msg = super::ServerMessage::Error {
+            message: "Something unexpected".to_string(),
+            code: None,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"error""#));
+        assert!(json.contains(r#""message":"Something unexpected""#));
+        assert!(!json.contains("code"));
     }
 }
