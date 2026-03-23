@@ -394,15 +394,19 @@
 	}
 
 	.powerup-tray {
-		display: flex;
+		--slot-size: 40px;
+		display: grid;
+		grid-template-columns: repeat(2, auto);
 		gap: 0.35rem;
 		flex-shrink: 0;
+		max-height: var(--slot-size);
+		overflow: visible;
 	}
 
 	.powerup-slot {
 		position: relative;
-		width: 40px;
-		height: 40px;
+		width: var(--slot-size);
+		height: var(--slot-size);
 		display: grid;
 		place-items: center;
 	}
@@ -436,13 +440,17 @@
 	}
 
 	.active-effects {
+		--badge-height: 1.65rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
 		flex-shrink: 0;
+		max-height: var(--badge-height);
+		overflow: visible;
 	}
 
 	.effect-badge {
+		height: var(--badge-height);
 		font-size: 0.9rem;
 		font-weight: 700;
 		padding: 0.25rem 0.5rem;
