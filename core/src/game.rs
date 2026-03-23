@@ -70,6 +70,7 @@ pub struct RoomState {
     pub next_player_id: u64,
     pub powerup_offers: Vec<PowerUpOffer>,
     pub active_powerups: Vec<ActivePowerUp>,
+    pub next_offer_id: u64,
 }
 
 impl RoomState {
@@ -80,6 +81,7 @@ impl RoomState {
         self.round_id = 0;
         self.powerup_offers.clear();
         self.active_powerups.clear();
+        self.next_offer_id = 0;
         for player in self.players.values_mut() {
             player.size = DEFAULT_START_SIZE;
             player.progress.clear();
@@ -100,9 +102,11 @@ impl RoomState {
                 .as_millis() as u64
         });
 
+        let now = Instant::now();
         let active_powerups = self
             .active_powerups
             .iter()
+            .filter(|pu| pu.expires_at > now)
             .map(ActivePowerUp::to_snapshot)
             .collect();
 
@@ -194,6 +198,7 @@ mod tests {
             next_player_id: 3,
             powerup_offers: Vec::new(),
             active_powerups: Vec::new(),
+            next_offer_id: 0,
         }
     }
 
@@ -251,7 +256,9 @@ mod tests {
         room.players.get_mut(&1).unwrap().size = 30.0;
         room.players.get_mut(&2).unwrap().size = 20.0;
         room.players.get_mut(&1).unwrap().progress = "partial".to_string();
+        room.next_offer_id = 5;
         room.powerup_offers.push(PowerUpOffer {
+            offer_id: 4,
             kind: PowerUpKind::DoublePoints,
             player_id: 2,
             expires_at: Instant::now(),
@@ -269,6 +276,7 @@ mod tests {
         assert!(room.prompt.is_empty());
         assert!(room.powerup_offers.is_empty());
         assert!(room.active_powerups.is_empty());
+        assert_eq!(room.next_offer_id, 0);
         assert_eq!(room.round_id, 0);
         assert_eq!(room.players.len(), 2);
         assert_eq!(room.players.get(&1).unwrap().size, DEFAULT_START_SIZE);

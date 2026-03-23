@@ -96,11 +96,15 @@ pub enum ServerMessage {
         code: Option<ErrorCode>,
     },
     PowerUpOffered {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
         kind: PowerUpKind,
         #[serde(rename = "expiresInMs")]
         expires_in_ms: u64,
     },
     PowerUpActivated {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
         #[serde(rename = "playerId")]
         player_id: PlayerId,
         kind: PowerUpKind,
@@ -108,6 +112,8 @@ pub enum ServerMessage {
         duration_ms: u64,
     },
     PowerUpOfferExpired {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
         kind: PowerUpKind,
     },
     PowerUpEffectEnded {
@@ -165,11 +171,13 @@ mod tests {
     #[test]
     fn serializes_powerup_offered() {
         let msg = super::ServerMessage::PowerUpOffered {
+            offer_id: 5,
             kind: super::PowerUpKind::FreezeAllCompetitors,
             expires_in_ms: 30000,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpOffered""#));
+        assert!(json.contains(r#""offerId":5"#));
         assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
         assert!(json.contains(r#""expiresInMs":30000"#));
     }
@@ -177,12 +185,14 @@ mod tests {
     #[test]
     fn serializes_powerup_activated() {
         let msg = super::ServerMessage::PowerUpActivated {
+            offer_id: 3,
             player_id: 2,
             kind: super::PowerUpKind::DoublePoints,
             duration_ms: 30000,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpActivated""#));
+        assert!(json.contains(r#""offerId":3"#));
         assert!(json.contains(r#""playerId":2"#));
         assert!(json.contains(r#""kind":"doublePoints""#));
         assert!(json.contains(r#""durationMs":30000"#));
@@ -191,10 +201,12 @@ mod tests {
     #[test]
     fn serializes_powerup_offer_expired() {
         let msg = super::ServerMessage::PowerUpOfferExpired {
+            offer_id: 7,
             kind: super::PowerUpKind::DoublePoints,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpOfferExpired""#));
+        assert!(json.contains(r#""offerId":7"#));
         assert!(json.contains(r#""kind":"doublePoints""#));
     }
 

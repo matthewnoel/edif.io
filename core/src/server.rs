@@ -386,6 +386,7 @@ async fn join_or_create_room(
                     next_player_id: 1,
                     powerup_offers: Vec::new(),
                     active_powerups: Vec::new(),
+                    next_offer_id: 0,
                 },
             );
             generated
@@ -530,6 +531,7 @@ async fn handle_submission(
                         expires_at: now + duration,
                     });
                     earned_powerups.push(ServerMessage::PowerUpActivated {
+                        offer_id: offer.offer_id,
                         player_id,
                         kind: offer.kind,
                         duration_ms: duration.as_millis() as u64,
@@ -697,7 +699,10 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                 for offer in &expired.expired_offers {
                     expired_offer_notifs.push((
                         offer.player_id,
-                        ServerMessage::PowerUpOfferExpired { kind: offer.kind },
+                        ServerMessage::PowerUpOfferExpired {
+                            offer_id: offer.offer_id,
+                            kind: offer.kind,
+                        },
                     ));
                 }
                 for effect in &expired.expired_effects {
@@ -718,7 +723,10 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                 if let Some(recipient) = pick_powerup_recipient(&players, &mut rng) {
                     let kind = pick_powerup_kind(&mut rng);
                     let expires_at = now + offer_duration();
+                    let offer_id = room.next_offer_id;
+                    room.next_offer_id += 1;
                     room.powerup_offers.push(PowerUpOffer {
+                        offer_id,
                         kind,
                         player_id: recipient,
                         expires_at,
@@ -727,6 +735,7 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                     new_offer_notif = Some((
                         recipient,
                         ServerMessage::PowerUpOffered {
+                            offer_id,
                             kind,
                             expires_in_ms,
                         },
@@ -1159,7 +1168,10 @@ mod tests {
         {
             let mut rooms = state.rooms.lock().await;
             let room = rooms.get_mut(&room_code).expect("room exists");
+            let offer_id = room.next_offer_id;
+            room.next_offer_id += 1;
             room.powerup_offers.push(PowerUpOffer {
+                offer_id,
                 kind: PowerUpKind::FreezeAllCompetitors,
                 player_id: pid,
                 expires_at: Instant::now() + Duration::from_secs(30),

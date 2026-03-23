@@ -64,6 +64,7 @@
 	let myActiveEffects = $derived(
 		(gs.room?.activePowerups ?? [])
 			.filter((pu) => {
+				if (pu.remainingMs <= 0) return false;
 				const meta = POWERUP_META[pu.kind];
 				return meta.affectsSelf
 					? pu.sourcePlayerId === gs.playerId
@@ -137,8 +138,6 @@
 			offsets[i] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;
-
-		gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.expiresAt > now);
 
 		animationHandle = requestAnimationFrame(animate);
 	}
@@ -224,7 +223,7 @@
 				<div class="input-row">
 					{#if gs.pendingPowerUps.length > 0}
 						<div class="powerup-tray">
-							{#each gs.pendingPowerUps as pu, i (pu.kind + '-' + i)}
+							{#each gs.pendingPowerUps as pu, i (pu.offerId)}
 								<div class="powerup-slot">
 									<svg class="countdown-ring" viewBox="0 0 40 40">
 										<circle class="ring-bg" r="17" cx="20" cy="20" />

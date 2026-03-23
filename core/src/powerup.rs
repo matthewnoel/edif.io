@@ -17,6 +17,7 @@ pub const DISTRIBUTION_INTERVAL_SECS: u64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct PowerUpOffer {
+    pub offer_id: u64,
     pub kind: PowerUpKind,
     pub player_id: PlayerId,
     pub expires_at: Instant,
@@ -245,11 +246,13 @@ mod tests {
         let now = Instant::now();
         let mut offers = vec![
             PowerUpOffer {
+                offer_id: 0,
                 kind: PowerUpKind::DoublePoints,
                 player_id: 1,
                 expires_at: now - Duration::from_secs(1),
             },
             PowerUpOffer {
+                offer_id: 1,
                 kind: PowerUpKind::FreezeAllCompetitors,
                 player_id: 2,
                 expires_at: now + Duration::from_secs(10),

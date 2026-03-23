@@ -142,6 +142,7 @@ describe('decodeServerMessage', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({
 				type: 'powerUpOffered',
+				offerId: 5,
 				kind: 'freezeAllCompetitors',
 				expiresInMs: 30000
 			})
@@ -153,6 +154,7 @@ describe('decodeServerMessage', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({
 				type: 'powerUpActivated',
+				offerId: 3,
 				playerId: 2,
 				kind: 'doublePoints',
 				durationMs: 30000
@@ -165,6 +167,7 @@ describe('decodeServerMessage', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({
 				type: 'powerUpOfferExpired',
+				offerId: 7,
 				kind: 'doublePoints'
 			})
 		);
@@ -186,6 +189,7 @@ describe('decodeServerMessage', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({
 				type: 'powerUpOffered',
+				offerId: 0,
 				kind: 'unknownPowerUp',
 				expiresInMs: 30000
 			})
