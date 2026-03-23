@@ -1,5 +1,17 @@
 use crate::game::{PlayerId, RoomSnapshot};
+use crate::powerup::PowerUpKind;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorCode {
+    RoomNotFound,
+    InvalidGameMode,
+    InvalidMessageFormat,
+    InvalidRejoinToken,
+    RoomExpired,
+    PlayerNotInRoom,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -11,6 +23,8 @@ pub enum ClientMessage {
         room_code: Option<String>,
         #[serde(rename = "gameMode")]
         game_mode: Option<String>,
+        #[serde(rename = "matchDurationSecs")]
+        match_duration_secs: Option<u64>,
     },
     RejoinRoom {
         #[serde(rename = "rejoinToken")]
@@ -22,6 +36,8 @@ pub enum ClientMessage {
     SubmitAttempt {
         text: String,
     },
+    StartMatch,
+    Rematch,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -34,8 +50,8 @@ pub enum ServerMessage {
         room_code: String,
         #[serde(rename = "gameKey")]
         game_key: String,
-        #[serde(rename = "minEatableSize")]
-        min_eatable_size: f32,
+        #[serde(rename = "inputPlaceholder")]
+        input_placeholder: String,
         #[serde(rename = "rejoinToken")]
         rejoin_token: String,
     },
@@ -65,13 +81,45 @@ pub enum ServerMessage {
         winner_player_id: PlayerId,
         #[serde(rename = "growthAwarded")]
         growth_awarded: f32,
-        #[serde(rename = "consumedPlayerIds")]
-        consumed_player_ids: Vec<PlayerId>,
-        #[serde(rename = "matchWinner")]
-        match_winner: Option<PlayerId>,
+    },
+    WrongAnswer {
+        #[serde(rename = "roomCode")]
+        room_code: String,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        #[serde(rename = "shrinkApplied")]
+        shrink_applied: f32,
     },
     Error {
         message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<ErrorCode>,
+    },
+    PowerUpOffered {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
+        kind: PowerUpKind,
+        #[serde(rename = "expiresInMs")]
+        expires_in_ms: u64,
+    },
+    PowerUpActivated {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        kind: PowerUpKind,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+    },
+    PowerUpOfferExpired {
+        #[serde(rename = "offerId")]
+        offer_id: u64,
+        kind: PowerUpKind,
+    },
+    PowerUpEffectEnded {
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        kind: PowerUpKind,
     },
 }
 
@@ -81,7 +129,7 @@ mod tests {
 
     #[test]
     fn parses_all_supported_client_messages() {
-        let join = r#"{"type":"joinOrCreateRoom","playerName":"Alice","roomCode":"ABCD","gameMode":"keyboarding"}"#;
+        let join = r#"{"type":"joinOrCreateRoom","playerName":"Alice","roomCode":"ABCD","gameMode":"keyboarding","matchDurationSecs":90}"#;
         assert!(serde_json::from_str::<ClientMessage>(join).is_ok());
 
         let rejoin = r#"{"type":"rejoinRoom","rejoinToken":"abc123"}"#;
@@ -92,11 +140,109 @@ mod tests {
 
         let submit = r#"{"type":"submitAttempt","text":"hello"}"#;
         assert!(serde_json::from_str::<ClientMessage>(submit).is_ok());
+
+        let start = r#"{"type":"startMatch"}"#;
+        assert!(serde_json::from_str::<ClientMessage>(start).is_ok());
+
+        let rematch = r#"{"type":"rematch"}"#;
+        assert!(serde_json::from_str::<ClientMessage>(rematch).is_ok());
     }
 
     #[test]
     fn rejects_removed_ping_message() {
         let ping = r#"{"type":"ping","sentAtMs":123}"#;
         assert!(serde_json::from_str::<ClientMessage>(ping).is_err());
+    }
+
+    #[test]
+    fn serializes_wrong_answer_message() {
+        let msg = super::ServerMessage::WrongAnswer {
+            room_code: "ABCD".to_string(),
+            player_id: 1,
+            shrink_applied: 2.0,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"wrongAnswer""#));
+        assert!(json.contains(r#""roomCode":"ABCD""#));
+        assert!(json.contains(r#""playerId":1"#));
+        assert!(json.contains(r#""shrinkApplied":2.0"#));
+    }
+
+    #[test]
+    fn serializes_powerup_offered() {
+        let msg = super::ServerMessage::PowerUpOffered {
+            offer_id: 5,
+            kind: super::PowerUpKind::FreezeAllCompetitors,
+            expires_in_ms: 30000,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpOffered""#));
+        assert!(json.contains(r#""offerId":5"#));
+        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+        assert!(json.contains(r#""expiresInMs":30000"#));
+    }
+
+    #[test]
+    fn serializes_powerup_activated() {
+        let msg = super::ServerMessage::PowerUpActivated {
+            offer_id: 3,
+            player_id: 2,
+            kind: super::PowerUpKind::DoublePoints,
+            duration_ms: 30000,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpActivated""#));
+        assert!(json.contains(r#""offerId":3"#));
+        assert!(json.contains(r#""playerId":2"#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
+        assert!(json.contains(r#""durationMs":30000"#));
+    }
+
+    #[test]
+    fn serializes_powerup_offer_expired() {
+        let msg = super::ServerMessage::PowerUpOfferExpired {
+            offer_id: 7,
+            kind: super::PowerUpKind::DoublePoints,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpOfferExpired""#));
+        assert!(json.contains(r#""offerId":7"#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
+    }
+
+    #[test]
+    fn serializes_powerup_effect_ended() {
+        let msg = super::ServerMessage::PowerUpEffectEnded {
+            player_id: 1,
+            kind: super::PowerUpKind::FreezeAllCompetitors,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"powerUpEffectEnded""#));
+        assert!(json.contains(r#""playerId":1"#));
+        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+    }
+
+    #[test]
+    fn serializes_error_with_code() {
+        let msg = super::ServerMessage::Error {
+            message: "No room found with code ZZZZ".to_string(),
+            code: Some(super::ErrorCode::RoomNotFound),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"error""#));
+        assert!(json.contains(r#""message":"No room found with code ZZZZ""#));
+        assert!(json.contains(r#""code":"roomNotFound""#));
+    }
+
+    #[test]
+    fn serializes_error_without_code() {
+        let msg = super::ServerMessage::Error {
+            message: "Something unexpected".to_string(),
+            code: None,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains(r#""type":"error""#));
+        assert!(json.contains(r#""message":"Something unexpected""#));
+        assert!(!json.contains("code"));
     }
 }

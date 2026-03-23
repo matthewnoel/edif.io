@@ -18,6 +18,7 @@
 	let playerName = $state('');
 	let roomCodeInput = $state('');
 	let selectedGameMode = $state<GameMode>('keyboarding');
+	let matchDuration = $state('60');
 	let code = $derived(roomCodeInput);
 
 	onMount(() => {
@@ -34,13 +35,18 @@
 	function createRoom(): void {
 		connect(wsUrl, {
 			playerName,
-			gameMode: selectedGameMode
+			gameMode: selectedGameMode,
+			matchDurationSecs: parseInt(matchDuration) || 60
 		});
 	}
 
 	function joinRoom(): void {
 		if (!code) {
 			gs.errorMessage = 'Enter a room code to join';
+			return;
+		}
+		if (code.length < 4) {
+			gs.errorMessage = 'Room codes are 4 letters';
 			return;
 		}
 		connect(wsUrl, {
@@ -75,6 +81,16 @@
 					{ value: 'keyboarding', label: 'Keyboarding' },
 					{ value: 'arithmetic', label: 'Arithmetic' }
 				]}
+			/>
+		</label>
+		<label>
+			<strong>Match Duration in Seconds:</strong>
+			<TextInput
+				bind:value={matchDuration}
+				type="number"
+				min="5"
+				placeholder="60"
+				autocomplete="off"
 			/>
 		</label>
 		<label>
@@ -128,7 +144,7 @@
 
 <style>
 	h1 {
-		font-size: 3rem;
+		font-size: 4rem;
 		text-align: center;
 		margin: 1rem 0 0 0;
 	}
