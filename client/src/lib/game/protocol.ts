@@ -17,6 +17,7 @@ export type ActivePowerUpSnapshot = {
 	kind: PowerUpKind;
 	sourcePlayerId: number;
 	remainingMs: number;
+	durationMs: number;
 };
 
 export type PlayerSnapshot = {
@@ -125,7 +126,8 @@ function isActivePowerUpSnapshot(value: unknown): value is ActivePowerUpSnapshot
 	return (
 		isPowerUpKind(value.kind) &&
 		typeof value.sourcePlayerId === 'number' &&
-		typeof value.remainingMs === 'number'
+		typeof value.remainingMs === 'number' &&
+		typeof value.durationMs === 'number'
 	);
 }
 

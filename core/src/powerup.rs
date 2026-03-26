@@ -45,6 +45,7 @@ pub struct ActivePowerUpSnapshot {
     pub kind: PowerUpKind,
     pub source_player_id: PlayerId,
     pub remaining_ms: u64,
+    pub duration_ms: u64,
 }
 
 impl ActivePowerUp {
@@ -57,6 +58,7 @@ impl ActivePowerUp {
             kind: self.kind,
             source_player_id: self.source_player_id,
             remaining_ms: remaining,
+            duration_ms: effect_duration(self.kind).as_millis() as u64,
         }
     }
 }

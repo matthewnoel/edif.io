@@ -22,6 +22,7 @@
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
+	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	type PowerUpMeta = {
@@ -75,6 +76,8 @@
 	let timerBaseMs = 0;
 	let timerSyncedAt = 0;
 	let powerupRingOffsets = $state<Record<number, number>>({});
+	let effectTimers = $state<Record<string, { expiresAt: number; durationMs: number }>>({});
+	let effectFractions = $state<Record<string, number>>({});
 	let promptInputEl: HTMLInputElement | null = $state(null);
 	let copyConfirmed = $state(false);
 	let copyTimeout = 0;
@@ -90,7 +93,13 @@
 						? pu.sourcePlayerId === gs.playerId
 						: pu.sourcePlayerId !== gs.playerId;
 				})
-				.map((pu) => [pu.kind, { ...POWERUP_META[pu.kind], kind: pu.kind }] as const)
+				.map(
+					(pu) =>
+						[
+							pu.kind,
+							{ ...POWERUP_META[pu.kind], kind: pu.kind, durationMs: pu.durationMs }
+						] as const
+				)
 		).values()
 	]);
 
@@ -153,6 +162,22 @@
 	});
 
 	$effect(() => {
+		const powerups = gs.room?.activePowerups ?? [];
+		const now = performance.now();
+		const timers: Record<string, { expiresAt: number; durationMs: number }> = {};
+		for (const pu of powerups) {
+			if (pu.remainingMs <= 0) continue;
+			const meta = POWERUP_META[pu.kind];
+			const applesToMe = meta.affectsSelf
+				? pu.sourcePlayerId === gs.playerId
+				: pu.sourcePlayerId !== gs.playerId;
+			if (!applesToMe) continue;
+			timers[pu.kind] = { expiresAt: now + pu.remainingMs, durationMs: pu.durationMs };
+		}
+		effectTimers = timers;
+	});
+
+	$effect(() => {
 		if (gs.room?.prompt && promptInputEl) {
 			promptInputEl.focus();
 		}
@@ -204,6 +229,12 @@
 			offsets[pu.offerId] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;
+
+		const fracs: Record<string, number> = {};
+		for (const [kind, timer] of Object.entries(effectTimers)) {
+			fracs[kind] = Math.max(0, (timer.expiresAt - now) / timer.durationMs);
+		}
+		effectFractions = fracs;
 
 		animationHandle = requestAnimationFrame(animate);
 	}
@@ -291,19 +322,14 @@
 				{#if otherPendingPowerUps.length > 0}
 					<div class="other-offers">
 						{#each otherPendingPowerUps as pu (pu.offerId)}
-							<div class="other-offer-badge">
-								<span class="other-offer-emoji">{POWERUP_META[pu.kind].emoji}</span>
-								<span class="other-offer-label" style:color={pu.playerColor}>
-									{pu.playerName} vying for
-									{POWERUP_META[pu.kind].label}
-								</span>
-								<div
-									class="other-offer-bar"
-									style:background={pu.playerColor}
-									style:width="{(1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE) *
-										100}%"
-								></div>
-							</div>
+							<PowerUpBadge
+								emoji={POWERUP_META[pu.kind].emoji}
+								label="{pu.playerName} vying for {POWERUP_META[pu.kind].label}"
+								fraction={1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE}
+								barColor={pu.playerColor}
+								labelColor={pu.playerColor}
+								variant="offer"
+							/>
 						{/each}
 					</div>
 				{/if}
@@ -358,10 +384,13 @@
 						{#if myActiveEffects.length > 0}
 							<div class="active-effects">
 								{#each myActiveEffects as effect (effect.kind)}
-									<div class="effect-badge" class:debuff={effect.disablesInput}>
-										<span>{effect.emoji}</span>
-										{effect.label}
-									</div>
+									<PowerUpBadge
+										emoji={effect.emoji}
+										label={effect.label}
+										fraction={effectFractions[effect.kind] ?? 1}
+										barColor={effect.disablesInput ? '#1e40af' : '#92400e'}
+										variant={effect.disablesInput ? 'debuff' : 'buff'}
+									/>
 								{/each}
 							</div>
 						{/if}
@@ -554,37 +583,6 @@
 		width: 100%;
 	}
 
-	.other-offer-badge {
-		position: relative;
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-		font-weight: 600;
-		padding: 0.25rem 0.5rem 0.45rem;
-		border-radius: 0.4rem;
-		background: #f3f4f6;
-		overflow: hidden;
-	}
-
-	.other-offer-emoji {
-		font-size: 1.1rem;
-		line-height: 1;
-	}
-
-	.other-offer-label {
-		white-space: nowrap;
-	}
-
-	.other-offer-bar {
-		position: absolute;
-		left: 0;
-		bottom: 0;
-		height: 3px;
-		border-radius: 0 0 0.4rem 0.4rem;
-		transition: width 60ms linear;
-	}
-
 	.powerup-toast {
 		text-align: center;
 		font-size: 1rem;
@@ -598,28 +596,10 @@
 	}
 
 	.active-effects {
-		--badge-height: 1.65rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
 		flex-shrink: 0;
-		max-height: var(--badge-height);
-		overflow: visible;
-	}
-
-	.effect-badge {
-		height: var(--badge-height);
-		font-size: 0.9rem;
-		font-weight: 700;
-		padding: 0.25rem 0.5rem;
-		border-radius: 0.4rem;
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	.effect-badge.debuff {
-		background: #dbeafe;
-		color: #1e40af;
 	}
 
 	.game-over-container {

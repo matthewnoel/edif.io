@@ -114,6 +114,8 @@ function handleServerMessage(message: ServerMessage): void {
 		case 'roomState':
 			gs.room = message.room;
 			if (message.room.matchWinner) {
+				gs.pendingPowerUps = [];
+				gs.powerUpToast = null;
 				const winner = message.room.players.find((p) => p.id === message.room.matchWinner);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.room.matchWinner}`} wins the match`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';

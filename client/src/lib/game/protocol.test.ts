@@ -61,8 +61,13 @@ describe('decodeServerMessage', () => {
 					matchRemainingMs: null,
 					hostPlayerId: 1,
 					activePowerups: [
-						{ kind: 'freezeAllCompetitors', sourcePlayerId: 2, remainingMs: 10000 },
-						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000 }
+						{
+							kind: 'freezeAllCompetitors',
+							sourcePlayerId: 2,
+							remainingMs: 10000,
+							durationMs: 15000
+						},
+						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000, durationMs: 30000 }
 					]
 				}
 			})
