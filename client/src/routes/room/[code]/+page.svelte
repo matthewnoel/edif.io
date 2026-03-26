@@ -79,6 +79,7 @@
 	let effectTimers = $state<Record<string, { expiresAt: number; durationMs: number }>>({});
 	let effectFractions = $state<Record<string, number>>({});
 	let promptInputEl: HTMLInputElement | null = $state(null);
+	let lastEffectTimerKey = '';
 	let copyConfirmed = $state(false);
 	let copyTimeout = 0;
 	let powerUpToastTimeout = 0;
@@ -163,15 +164,19 @@
 
 	$effect(() => {
 		const powerups = gs.room?.activePowerups ?? [];
+		const key = JSON.stringify(powerups);
+		if (key === lastEffectTimerKey) return;
+		lastEffectTimerKey = key;
+
 		const now = performance.now();
 		const timers: Record<string, { expiresAt: number; durationMs: number }> = {};
 		for (const pu of powerups) {
 			if (pu.remainingMs <= 0) continue;
 			const meta = POWERUP_META[pu.kind];
-			const applesToMe = meta.affectsSelf
+			const appliesToMe = meta.affectsSelf
 				? pu.sourcePlayerId === gs.playerId
 				: pu.sourcePlayerId !== gs.playerId;
-			if (!applesToMe) continue;
+			if (!appliesToMe) continue;
 			timers[pu.kind] = { expiresAt: now + pu.remainingMs, durationMs: pu.durationMs };
 		}
 		effectTimers = timers;
