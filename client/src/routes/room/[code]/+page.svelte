@@ -22,6 +22,7 @@
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
+	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	type PowerUpMeta = {
@@ -43,6 +44,24 @@
 			label: '2x Points',
 			affectsSelf: true,
 			disablesInput: false
+		},
+		scrambleFont: {
+			emoji: '\u{1F92A}',
+			label: 'Scrambled!',
+			affectsSelf: false,
+			disablesInput: false
+		},
+		scoreSteal: {
+			emoji: '\u{1F422}',
+			label: 'Blue Shell!',
+			affectsSelf: true,
+			disablesInput: false
+		},
+		ongoingScoreSteal: {
+			emoji: '\u{1F355}',
+			label: 'Point Eater!',
+			affectsSelf: true,
+			disablesInput: false
 		}
 	};
 
@@ -57,25 +76,70 @@
 	let timerBaseMs = 0;
 	let timerSyncedAt = 0;
 	let powerupRingOffsets = $state<Record<number, number>>({});
+	let effectTimers = $state<Record<string, { expiresAt: number; durationMs: number }>>({});
+	let effectFractions = $state<Record<string, number>>({});
 	let promptInputEl: HTMLInputElement | null = $state(null);
+	let lastEffectTimerKey = '';
 	let copyConfirmed = $state(false);
 	let copyTimeout = 0;
+	let powerUpToastTimeout = 0;
 
-	let myActiveEffects = $derived(
-		(gs.room?.activePowerups ?? [])
-			.filter((pu) => {
-				if (pu.remainingMs <= 0) return false;
-				const meta = POWERUP_META[pu.kind];
-				return meta.affectsSelf
-					? pu.sourcePlayerId === gs.playerId
-					: pu.sourcePlayerId !== gs.playerId;
-			})
-			.map((pu) => ({ ...POWERUP_META[pu.kind], kind: pu.kind }))
-	);
+	let myActiveEffects = $derived([
+		...new Map(
+			(gs.room?.activePowerups ?? [])
+				.filter((pu) => {
+					if (pu.remainingMs <= 0) return false;
+					const meta = POWERUP_META[pu.kind];
+					return meta.affectsSelf
+						? pu.sourcePlayerId === gs.playerId
+						: pu.sourcePlayerId !== gs.playerId;
+				})
+				.map(
+					(pu) =>
+						[
+							pu.kind,
+							{ ...POWERUP_META[pu.kind], kind: pu.kind, durationMs: pu.durationMs }
+						] as const
+				)
+		).values()
+	]);
 
 	let inputDisabled = $derived(myActiveEffects.some((e) => e.disablesInput));
 
+	let promptScrambled = $derived(
+		(gs.room?.activePowerups ?? []).some(
+			(pu) => pu.kind === 'scrambleFont' && pu.sourcePlayerId !== gs.playerId && pu.remainingMs > 0
+		)
+	);
+
 	let myColor = $derived(gs.room?.players.find((p) => p.id === gs.playerId)?.color ?? null);
+
+	let myPendingPowerUps = $derived(gs.pendingPowerUps.filter((pu) => pu.playerId === gs.playerId));
+
+	let otherPendingPowerUps = $derived(
+		gs.pendingPowerUps
+			.filter((pu) => pu.playerId !== gs.playerId)
+			.map((pu) => {
+				const player = gs.room?.players.find((p) => p.id === pu.playerId);
+				return { ...pu, playerName: player?.name ?? '???', playerColor: player?.color ?? '#888' };
+			})
+	);
+
+	function playerPowerUpEmojis(playerId: number): string {
+		return [
+			...new Set(
+				(gs.room?.activePowerups ?? [])
+					.filter((pu) => {
+						if (pu.remainingMs <= 0) return false;
+						const meta = POWERUP_META[pu.kind];
+						return meta.affectsSelf
+							? pu.sourcePlayerId === playerId
+							: pu.sourcePlayerId !== playerId;
+					})
+					.map((pu) => POWERUP_META[pu.kind].emoji)
+			)
+		].join('');
+	}
 
 	function formatTimer(ms: number): string {
 		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
@@ -99,8 +163,37 @@
 	});
 
 	$effect(() => {
+		const powerups = gs.room?.activePowerups ?? [];
+		const key = JSON.stringify(powerups);
+		if (key === lastEffectTimerKey) return;
+		lastEffectTimerKey = key;
+
+		const now = performance.now();
+		const timers: Record<string, { expiresAt: number; durationMs: number }> = {};
+		for (const pu of powerups) {
+			if (pu.remainingMs <= 0) continue;
+			const meta = POWERUP_META[pu.kind];
+			const appliesToMe = meta.affectsSelf
+				? pu.sourcePlayerId === gs.playerId
+				: pu.sourcePlayerId !== gs.playerId;
+			if (!appliesToMe) continue;
+			timers[pu.kind] = { expiresAt: now + pu.remainingMs, durationMs: pu.durationMs };
+		}
+		effectTimers = timers;
+	});
+
+	$effect(() => {
 		if (gs.room?.prompt && promptInputEl) {
 			promptInputEl.focus();
+		}
+	});
+
+	$effect(() => {
+		if (gs.powerUpToast) {
+			clearTimeout(powerUpToastTimeout);
+			powerUpToastTimeout = window.setTimeout(() => {
+				gs.powerUpToast = null;
+			}, 3000);
 		}
 	});
 
@@ -129,15 +222,24 @@
 		}
 
 		const now = performance.now();
+		const expired = gs.pendingPowerUps.filter((pu) => pu.expiresAt <= now);
+		if (expired.length > 0) {
+			gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.expiresAt > now);
+		}
 		const offsets: Record<number, number> = {};
-		for (let i = 0; i < gs.pendingPowerUps.length; i++) {
-			const pu = gs.pendingPowerUps[i];
+		for (const pu of gs.pendingPowerUps) {
 			const remaining = Math.max(0, pu.expiresAt - now);
 			const total = 30_000;
 			const fraction = remaining / total;
-			offsets[i] = RING_CIRCUMFERENCE * (1 - fraction);
+			offsets[pu.offerId] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;
+
+		const fracs: Record<string, number> = {};
+		for (const [kind, timer] of Object.entries(effectTimers)) {
+			fracs[kind] = Math.max(0, (timer.expiresAt - now) / timer.durationMs);
+		}
+		effectFractions = fracs;
 
 		animationHandle = requestAnimationFrame(animate);
 	}
@@ -206,7 +308,9 @@
 				</div>
 			{/if}
 			{#if gs.room?.prompt}
-				<div class="prompt"><strong>{gs.room?.prompt}</strong></div>
+				<div class="prompt" class:shizuru-regular={promptScrambled}>
+					<strong>{gs.room?.prompt}</strong>
+				</div>
 			{:else if !gs.room?.matchWinner}
 				<div class="prompt">
 					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>
@@ -220,10 +324,33 @@
 					</div>
 				</div>
 			{:else}
+				{#if otherPendingPowerUps.length > 0}
+					<div class="other-offers">
+						{#each otherPendingPowerUps as pu (pu.offerId)}
+							<PowerUpBadge
+								emoji={POWERUP_META[pu.kind].emoji}
+								label="{pu.playerName} vying for {POWERUP_META[pu.kind].label}"
+								fraction={1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE}
+								barColor={pu.playerColor}
+								labelColor={pu.playerColor}
+								variant="offer"
+							/>
+						{/each}
+					</div>
+				{/if}
+				{#if gs.powerUpToast}
+					{@const meta = POWERUP_META[gs.powerUpToast]}
+					{#key gs.powerUpToast}
+						<div class="powerup-toast">
+							{meta.emoji}
+							{meta.label}
+						</div>
+					{/key}
+				{/if}
 				<div class="input-row">
-					{#if gs.pendingPowerUps.length > 0}
+					{#if myPendingPowerUps.length > 0}
 						<div class="powerup-tray">
-							{#each gs.pendingPowerUps as pu, i (pu.offerId)}
+							{#each myPendingPowerUps as pu (pu.offerId)}
 								<div class="powerup-slot">
 									<svg class="countdown-ring" viewBox="0 0 40 40">
 										<circle class="ring-bg" r="17" cx="20" cy="20" />
@@ -233,7 +360,7 @@
 											cx="20"
 											cy="20"
 											stroke-dasharray={RING_CIRCUMFERENCE}
-											stroke-dashoffset={powerupRingOffsets[i] ?? 0}
+											stroke-dashoffset={powerupRingOffsets[pu.offerId] ?? 0}
 											style:stroke={myColor}
 										/>
 									</svg>
@@ -262,10 +389,13 @@
 						{#if myActiveEffects.length > 0}
 							<div class="active-effects">
 								{#each myActiveEffects as effect (effect.kind)}
-									<div class="effect-badge" class:debuff={effect.disablesInput}>
-										<span>{effect.emoji}</span>
-										{effect.label}
-									</div>
+									<PowerUpBadge
+										emoji={effect.emoji}
+										label={effect.label}
+										fraction={effectFractions[effect.kind] ?? 1}
+										barColor={effect.disablesInput ? '#1e40af' : '#92400e'}
+										variant={effect.disablesInput ? 'debuff' : 'buff'}
+									/>
 								{/each}
 							</div>
 						{/if}
@@ -287,6 +417,7 @@
 					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
 				>
 					<div class="name">{player.name}</div>
+					<div class="powerup-emojis">{playerPowerUpEmojis(player.id)}</div>
 					<div class="size">{player.size.toFixed(1)}</div>
 					<div class="progress">{player.progress}</div>
 				</div>
@@ -446,29 +577,34 @@
 		z-index: 1;
 	}
 
+	.other-offers {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		margin: 0 auto;
+		max-width: 480px;
+		width: 100%;
+	}
+
+	.powerup-toast {
+		text-align: center;
+		font-size: 1rem;
+		font-weight: 700;
+		padding: 0.35rem 0.75rem;
+		border-radius: 0.5rem;
+		background: #d1fae5;
+		color: #065f46;
+		animation: fade-in-out 3s ease forwards;
+		margin: 0 auto 0.4rem;
+	}
+
 	.active-effects {
-		--badge-height: 1.65rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
 		flex-shrink: 0;
-		max-height: var(--badge-height);
-		overflow: visible;
-	}
-
-	.effect-badge {
-		height: var(--badge-height);
-		font-size: 0.9rem;
-		font-weight: 700;
-		padding: 0.25rem 0.5rem;
-		border-radius: 0.4rem;
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	.effect-badge.debuff {
-		background: #dbeafe;
-		color: #1e40af;
 	}
 
 	.game-over-container {
@@ -518,6 +654,11 @@
 	}
 
 	.name {
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.powerup-emojis {
 		font-size: 0.85rem;
 		font-weight: 600;
 	}

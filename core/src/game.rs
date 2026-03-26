@@ -154,6 +154,48 @@ pub fn apply_wrong_answer_penalty(
     Some(old_size - player.size)
 }
 
+pub fn find_top_player_ids(
+    players: &HashMap<PlayerId, PlayerState>,
+    exclude: PlayerId,
+) -> Vec<PlayerId> {
+    let max_size = players
+        .iter()
+        .filter(|(id, _)| **id != exclude)
+        .map(|(_, p)| p.size)
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    if max_size == f32::NEG_INFINITY {
+        return Vec::new();
+    }
+
+    players
+        .iter()
+        .filter(|(id, p)| **id != exclude && p.size == max_size)
+        .map(|(id, _)| *id)
+        .collect()
+}
+
+pub fn deduct_from_top_players(
+    room: &mut RoomState,
+    total_deduction: f32,
+    exclude: PlayerId,
+) -> f32 {
+    let top_ids = find_top_player_ids(&room.players, exclude);
+    if top_ids.is_empty() {
+        return 0.0;
+    }
+    let per_player = total_deduction / top_ids.len() as f32;
+    let mut actual_total = 0.0;
+    for id in &top_ids {
+        if let Some(player) = room.players.get_mut(id) {
+            let old = player.size;
+            player.size = (player.size - per_player).max(MIN_PLAYER_SIZE);
+            actual_total += old - player.size;
+        }
+    }
+    actual_total
+}
+
 pub fn resolve_match_by_timer(room: &mut RoomState) {
     if room.match_winner.is_some() || room.players.is_empty() {
         return;
@@ -321,5 +363,75 @@ mod tests {
         room.players.get_mut(&1).unwrap().progress = "partial".to_string();
         apply_wrong_answer_penalty(&mut room, 1, 2.0);
         assert!(room.players.get(&1).unwrap().progress.is_empty());
+    }
+
+    #[test]
+    fn find_top_player_ids_excludes_self() {
+        let mut room = test_room();
+        room.players.get_mut(&1).unwrap().size = 30.0;
+        room.players.get_mut(&2).unwrap().size = 20.0;
+        let top = find_top_player_ids(&room.players, 1);
+        assert_eq!(top, vec![2]);
+    }
+
+    #[test]
+    fn find_top_player_ids_returns_tied_players() {
+        let mut room = test_room();
+        room.players.insert(3, player(3, 10.0));
+        room.players.get_mut(&1).unwrap().size = 25.0;
+        room.players.get_mut(&2).unwrap().size = 25.0;
+        room.players.get_mut(&3).unwrap().size = 10.0;
+        let mut top = find_top_player_ids(&room.players, 3);
+        top.sort();
+        assert_eq!(top, vec![1, 2]);
+    }
+
+    #[test]
+    fn find_top_player_ids_empty_when_only_excluded() {
+        let mut room = test_room();
+        room.players.retain(|id, _| *id == 1);
+        let top = find_top_player_ids(&room.players, 1);
+        assert!(top.is_empty());
+    }
+
+    #[test]
+    fn deduct_from_top_players_basic() {
+        let mut room = test_room();
+        room.players.get_mut(&1).unwrap().size = 30.0;
+        room.players.get_mut(&2).unwrap().size = 20.0;
+        let deducted = deduct_from_top_players(&mut room, 5.0, 1);
+        assert_eq!(deducted, 5.0);
+        assert_eq!(room.players.get(&2).unwrap().size, 15.0);
+        assert_eq!(room.players.get(&1).unwrap().size, 30.0);
+    }
+
+    #[test]
+    fn deduct_from_top_players_splits_among_tied() {
+        let mut room = test_room();
+        room.players.insert(3, player(3, 20.0));
+        room.players.get_mut(&1).unwrap().size = 5.0;
+        room.players.get_mut(&2).unwrap().size = 20.0;
+        let deducted = deduct_from_top_players(&mut room, 6.0, 1);
+        assert_eq!(deducted, 6.0);
+        assert_eq!(room.players.get(&2).unwrap().size, 17.0);
+        assert_eq!(room.players.get(&3).unwrap().size, 17.0);
+    }
+
+    #[test]
+    fn deduct_from_top_players_clamps_to_min() {
+        let mut room = test_room();
+        room.players.get_mut(&1).unwrap().size = 5.0;
+        room.players.get_mut(&2).unwrap().size = 2.0;
+        let deducted = deduct_from_top_players(&mut room, 100.0, 1);
+        assert_eq!(deducted, 1.0);
+        assert_eq!(room.players.get(&2).unwrap().size, MIN_PLAYER_SIZE);
+    }
+
+    #[test]
+    fn deduct_from_top_players_returns_zero_when_no_targets() {
+        let mut room = test_room();
+        room.players.retain(|id, _| *id == 1);
+        let deducted = deduct_from_top_players(&mut room, 10.0, 1);
+        assert_eq!(deducted, 0.0);
     }
 }

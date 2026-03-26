@@ -61,8 +61,13 @@ describe('decodeServerMessage', () => {
 					matchRemainingMs: null,
 					hostPlayerId: 1,
 					activePowerups: [
-						{ kind: 'freezeAllCompetitors', sourcePlayerId: 2, remainingMs: 10000 },
-						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000 }
+						{
+							kind: 'freezeAllCompetitors',
+							sourcePlayerId: 2,
+							remainingMs: 10000,
+							durationMs: 15000
+						},
+						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000, durationMs: 30000 }
 					]
 				}
 			})
@@ -143,6 +148,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpOffered',
 				offerId: 5,
+				playerId: 2,
 				kind: 'freezeAllCompetitors',
 				expiresInMs: 30000
 			})
@@ -168,6 +174,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpOfferExpired',
 				offerId: 7,
+				playerId: 3,
 				kind: 'doublePoints'
 			})
 		);
@@ -185,11 +192,27 @@ describe('decodeServerMessage', () => {
 		expect(parsed?.type).toBe('powerUpEffectEnded');
 	});
 
+	it('parses powerUpOffered with new power-up kinds', () => {
+		for (const kind of ['scrambleFont', 'scoreSteal', 'ongoingScoreSteal']) {
+			const parsed = decodeServerMessage(
+				JSON.stringify({
+					type: 'powerUpOffered',
+					offerId: 1,
+					playerId: 1,
+					kind,
+					expiresInMs: 30000
+				})
+			);
+			expect(parsed?.type).toBe('powerUpOffered');
+		}
+	});
+
 	it('rejects powerUpOffered with invalid kind', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({
 				type: 'powerUpOffered',
 				offerId: 0,
+				playerId: 1,
 				kind: 'unknownPowerUp',
 				expiresInMs: 30000
 			})

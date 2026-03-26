@@ -56,7 +56,12 @@ function normalizeRoomCode(value: string): string {
 	return value.trim().toUpperCase();
 }
 
-export type PendingPowerUp = { offerId: number; kind: PowerUpKind; expiresAt: number };
+export type PendingPowerUp = {
+	offerId: number;
+	playerId: number;
+	kind: PowerUpKind;
+	expiresAt: number;
+};
 
 export const gs = $state({
 	phase: 'pregame' as ConnectionPhase,
@@ -73,7 +78,8 @@ export const gs = $state({
 	outboundCount: 0,
 	socketState: 'idle',
 	lastSocketDetail: '',
-	pendingPowerUps: [] as PendingPowerUp[]
+	pendingPowerUps: [] as PendingPowerUp[],
+	powerUpToast: null as PowerUpKind | null
 });
 
 let socket: WebSocket | null = null;
@@ -108,6 +114,8 @@ function handleServerMessage(message: ServerMessage): void {
 		case 'roomState':
 			gs.room = message.room;
 			if (message.room.matchWinner) {
+				gs.pendingPowerUps = [];
+				gs.powerUpToast = null;
 				const winner = message.room.players.find((p) => p.id === message.room.matchWinner);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.room.matchWinner}`} wins the match`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';
@@ -165,6 +173,7 @@ function handleServerMessage(message: ServerMessage): void {
 				...gs.pendingPowerUps,
 				{
 					offerId: message.offerId,
+					playerId: message.playerId,
 					kind: message.kind,
 					expiresAt: performance.now() + message.expiresInMs
 				}
@@ -177,14 +186,16 @@ function handleServerMessage(message: ServerMessage): void {
 			}
 			break;
 		}
-		case 'powerUpActivated':
+		case 'powerUpActivated': {
+			const idx = gs.pendingPowerUps.findIndex((pu) => pu.offerId === message.offerId);
+			if (idx !== -1) {
+				gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
+			}
 			if (message.playerId === gs.playerId) {
-				const idx = gs.pendingPowerUps.findIndex((pu) => pu.offerId === message.offerId);
-				if (idx !== -1) {
-					gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
-				}
+				gs.powerUpToast = message.kind;
 			}
 			break;
+		}
 		case 'powerUpEffectEnded':
 			break;
 	}

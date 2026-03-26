@@ -8,9 +8,18 @@ use std::time::{Duration, Instant};
 pub enum PowerUpKind {
     FreezeAllCompetitors,
     DoublePoints,
+    ScrambleFont,
+    ScoreSteal,
+    OngoingScoreSteal,
 }
 
-const ALL_KINDS: [PowerUpKind; 2] = [PowerUpKind::FreezeAllCompetitors, PowerUpKind::DoublePoints];
+const ALL_KINDS: [PowerUpKind; 5] = [
+    PowerUpKind::FreezeAllCompetitors,
+    PowerUpKind::DoublePoints,
+    PowerUpKind::ScrambleFont,
+    PowerUpKind::ScoreSteal,
+    PowerUpKind::OngoingScoreSteal,
+];
 
 pub const OFFER_DURATION_SECS: u64 = 30;
 pub const DISTRIBUTION_INTERVAL_SECS: u64 = 10;
@@ -36,6 +45,7 @@ pub struct ActivePowerUpSnapshot {
     pub kind: PowerUpKind,
     pub source_player_id: PlayerId,
     pub remaining_ms: u64,
+    pub duration_ms: u64,
 }
 
 impl ActivePowerUp {
@@ -48,6 +58,7 @@ impl ActivePowerUp {
             kind: self.kind,
             source_player_id: self.source_player_id,
             remaining_ms: remaining,
+            duration_ms: effect_duration(self.kind).as_millis() as u64,
         }
     }
 }
@@ -56,6 +67,9 @@ pub fn effect_duration(kind: PowerUpKind) -> Duration {
     match kind {
         PowerUpKind::FreezeAllCompetitors => Duration::from_secs(15),
         PowerUpKind::DoublePoints => Duration::from_secs(30),
+        PowerUpKind::ScrambleFont => Duration::from_secs(20),
+        PowerUpKind::ScoreSteal => Duration::from_secs(5),
+        PowerUpKind::OngoingScoreSteal => Duration::from_secs(30),
     }
 }
 
@@ -114,6 +128,15 @@ pub fn has_double_points(active_powerups: &[ActivePowerUp], player_id: PlayerId)
     let now = Instant::now();
     active_powerups.iter().any(|pu| {
         pu.kind == PowerUpKind::DoublePoints
+            && pu.source_player_id == player_id
+            && pu.expires_at > now
+    })
+}
+
+pub fn has_ongoing_score_steal(active_powerups: &[ActivePowerUp], player_id: PlayerId) -> bool {
+    let now = Instant::now();
+    active_powerups.iter().any(|pu| {
+        pu.kind == PowerUpKind::OngoingScoreSteal
             && pu.source_player_id == player_id
             && pu.expires_at > now
     })
@@ -202,7 +225,14 @@ mod tests {
         let mut rng = rand::rng();
         for _ in 0..100 {
             let kind = pick_powerup_kind(&mut rng);
-            assert!(kind == PowerUpKind::FreezeAllCompetitors || kind == PowerUpKind::DoublePoints);
+            assert!(matches!(
+                kind,
+                PowerUpKind::FreezeAllCompetitors
+                    | PowerUpKind::DoublePoints
+                    | PowerUpKind::ScrambleFont
+                    | PowerUpKind::ScoreSteal
+                    | PowerUpKind::OngoingScoreSteal
+            ));
         }
     }
 
@@ -239,6 +269,18 @@ mod tests {
         }];
         assert!(has_double_points(&actives, 1));
         assert!(!has_double_points(&actives, 2));
+    }
+
+    #[test]
+    fn ongoing_score_steal_check() {
+        let now = Instant::now();
+        let actives = vec![ActivePowerUp {
+            kind: PowerUpKind::OngoingScoreSteal,
+            source_player_id: 1,
+            expires_at: now + Duration::from_secs(10),
+        }];
+        assert!(has_ongoing_score_steal(&actives, 1));
+        assert!(!has_ongoing_score_steal(&actives, 2));
     }
 
     #[test]

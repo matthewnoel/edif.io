@@ -1,11 +1,13 @@
 use crate::adapter::{AdapterHandle, AdapterRegistry, build_adapter_registry};
 use crate::game::{
     DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
-    apply_wrong_answer_penalty, resolve_match_by_timer,
+    apply_wrong_answer_penalty, deduct_from_top_players, find_top_player_ids,
+    resolve_match_by_timer,
 };
 use crate::powerup::{
-    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpOffer, cleanup_expired, effect_duration,
-    has_double_points, is_player_frozen, offer_duration, pick_powerup_kind, pick_powerup_recipient,
+    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpKind, PowerUpOffer, cleanup_expired,
+    effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
+    pick_powerup_kind, pick_powerup_recipient,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
 use axum::Router;
@@ -20,7 +22,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, mpsc};
 
@@ -71,7 +73,12 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
         rooms: Mutex::new(HashMap::new()),
         connections: Mutex::new(HashMap::new()),
         rejoin_tokens: Mutex::new(HashMap::new()),
-        prompt_seed: AtomicU64::new(1),
+        prompt_seed: AtomicU64::new(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64,
+        ),
     });
 
     let app = Router::new()
@@ -513,6 +520,10 @@ async fn handle_submission(
                 });
                 should_advance_round = room.match_winner.is_none();
 
+                if has_ongoing_score_steal(&room.active_powerups, player_id) {
+                    deduct_from_top_players(room, growth, player_id);
+                }
+
                 let now = Instant::now();
                 let oldest_idx = room
                     .powerup_offers
@@ -536,6 +547,18 @@ async fn handle_submission(
                         kind: offer.kind,
                         duration_ms: duration.as_millis() as u64,
                     });
+
+                    if offer.kind == PowerUpKind::ScoreSteal {
+                        let top_ids = find_top_player_ids(&room.players, player_id);
+                        if let Some(&first) = top_ids.first() {
+                            let top_size = room.players.get(&first).map(|p| p.size).unwrap_or(0.0);
+                            let chunk = top_size * 0.10;
+                            let actual = deduct_from_top_players(room, chunk, player_id);
+                            if let Some(p) = room.players.get_mut(&player_id) {
+                                p.size += actual;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -680,9 +703,9 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                 break;
             }
 
-            let mut expired_offer_notifs: Vec<(PlayerId, ServerMessage)> = Vec::new();
+            let mut expired_offer_notifs: Vec<ServerMessage> = Vec::new();
             let mut expired_effect_broadcasts: Vec<ServerMessage> = Vec::new();
-            let mut new_offer_notif: Option<(PlayerId, ServerMessage)> = None;
+            let mut new_offer_notif: Option<ServerMessage> = None;
 
             {
                 let mut rooms = state.rooms.lock().await;
@@ -697,13 +720,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                     cleanup_expired(&mut room.powerup_offers, &mut room.active_powerups, now);
 
                 for offer in &expired.expired_offers {
-                    expired_offer_notifs.push((
-                        offer.player_id,
-                        ServerMessage::PowerUpOfferExpired {
-                            offer_id: offer.offer_id,
-                            kind: offer.kind,
-                        },
-                    ));
+                    expired_offer_notifs.push(ServerMessage::PowerUpOfferExpired {
+                        offer_id: offer.offer_id,
+                        player_id: offer.player_id,
+                        kind: offer.kind,
+                    });
                 }
                 for effect in &expired.expired_effects {
                     expired_effect_broadcasts.push(ServerMessage::PowerUpEffectEnded {
@@ -732,19 +753,17 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                         expires_at,
                     });
                     let expires_in_ms = offer_duration().as_millis() as u64;
-                    new_offer_notif = Some((
-                        recipient,
-                        ServerMessage::PowerUpOffered {
-                            offer_id,
-                            kind,
-                            expires_in_ms,
-                        },
-                    ));
+                    new_offer_notif = Some(ServerMessage::PowerUpOffered {
+                        offer_id,
+                        player_id: recipient,
+                        kind,
+                        expires_in_ms,
+                    });
                 }
             }
 
-            for (player_id, msg) in expired_offer_notifs {
-                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            for msg in expired_offer_notifs {
+                let _ = broadcast_to_room(&state, &room_code, &msg).await;
             }
             let had_expired_effects = !expired_effect_broadcasts.is_empty();
             for msg in expired_effect_broadcasts {
@@ -753,27 +772,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
             if had_expired_effects {
                 let _ = broadcast_room_state(&state, &room_code).await;
             }
-            if let Some((player_id, msg)) = new_offer_notif {
-                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            if let Some(msg) = new_offer_notif {
+                let _ = broadcast_to_room(&state, &room_code, &msg).await;
             }
         }
     });
-}
-
-async fn send_to_player(
-    state: &Arc<SharedState>,
-    room_code: &str,
-    player_id: PlayerId,
-    message: &ServerMessage,
-) -> bool {
-    let connections = state.connections.lock().await;
-    let Some(room_connections) = connections.get(room_code) else {
-        return false;
-    };
-    let Some(conn) = room_connections.get(&player_id) else {
-        return false;
-    };
-    send_server_message(&conn.sender, message).is_ok()
 }
 
 async fn disconnect_player(state: &Arc<SharedState>, room_code: &str, player_id: PlayerId) {

@@ -6,12 +6,18 @@ export type ErrorCode =
 	| 'roomExpired'
 	| 'playerNotInRoom';
 
-export type PowerUpKind = 'freezeAllCompetitors' | 'doublePoints';
+export type PowerUpKind =
+	| 'freezeAllCompetitors'
+	| 'doublePoints'
+	| 'scrambleFont'
+	| 'scoreSteal'
+	| 'ongoingScoreSteal';
 
 export type ActivePowerUpSnapshot = {
 	kind: PowerUpKind;
 	sourcePlayerId: number;
 	remainingMs: number;
+	durationMs: number;
 };
 
 export type PlayerSnapshot = {
@@ -69,7 +75,13 @@ export type ServerMessage =
 	  }
 	| { type: 'wrongAnswer'; roomCode: string; playerId: number; shrinkApplied: number }
 	| { type: 'error'; message: string; code?: ErrorCode }
-	| { type: 'powerUpOffered'; offerId: number; kind: PowerUpKind; expiresInMs: number }
+	| {
+			type: 'powerUpOffered';
+			offerId: number;
+			playerId: number;
+			kind: PowerUpKind;
+			expiresInMs: number;
+	  }
 	| {
 			type: 'powerUpActivated';
 			offerId: number;
@@ -77,7 +89,7 @@ export type ServerMessage =
 			kind: PowerUpKind;
 			durationMs: number;
 	  }
-	| { type: 'powerUpOfferExpired'; offerId: number; kind: PowerUpKind }
+	| { type: 'powerUpOfferExpired'; offerId: number; playerId: number; kind: PowerUpKind }
 	| { type: 'powerUpEffectEnded'; playerId: number; kind: PowerUpKind };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -97,7 +109,13 @@ function isErrorCode(value: unknown): value is ErrorCode {
 	return typeof value === 'string' && VALID_ERROR_CODES.includes(value as ErrorCode);
 }
 
-const VALID_POWERUP_KINDS: PowerUpKind[] = ['freezeAllCompetitors', 'doublePoints'];
+const VALID_POWERUP_KINDS: PowerUpKind[] = [
+	'freezeAllCompetitors',
+	'doublePoints',
+	'scrambleFont',
+	'scoreSteal',
+	'ongoingScoreSteal'
+];
 
 function isPowerUpKind(value: unknown): value is PowerUpKind {
 	return typeof value === 'string' && VALID_POWERUP_KINDS.includes(value as PowerUpKind);
@@ -108,7 +126,8 @@ function isActivePowerUpSnapshot(value: unknown): value is ActivePowerUpSnapshot
 	return (
 		isPowerUpKind(value.kind) &&
 		typeof value.sourcePlayerId === 'number' &&
-		typeof value.remainingMs === 'number'
+		typeof value.remainingMs === 'number' &&
+		typeof value.durationMs === 'number'
 	);
 }
 
@@ -186,6 +205,7 @@ function isServerMessage(value: unknown): value is ServerMessage {
 		case 'powerUpOffered':
 			return (
 				typeof value.offerId === 'number' &&
+				typeof value.playerId === 'number' &&
 				isPowerUpKind(value.kind) &&
 				typeof value.expiresInMs === 'number'
 			);
@@ -197,7 +217,11 @@ function isServerMessage(value: unknown): value is ServerMessage {
 				typeof value.durationMs === 'number'
 			);
 		case 'powerUpOfferExpired':
-			return typeof value.offerId === 'number' && isPowerUpKind(value.kind);
+			return (
+				typeof value.offerId === 'number' &&
+				typeof value.playerId === 'number' &&
+				isPowerUpKind(value.kind)
+			);
 		case 'powerUpEffectEnded':
 			return typeof value.playerId === 'number' && isPowerUpKind(value.kind);
 		default:
