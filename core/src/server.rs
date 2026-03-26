@@ -22,7 +22,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, mpsc};
 
@@ -73,7 +73,12 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
         rooms: Mutex::new(HashMap::new()),
         connections: Mutex::new(HashMap::new()),
         rejoin_tokens: Mutex::new(HashMap::new()),
-        prompt_seed: AtomicU64::new(1),
+        prompt_seed: AtomicU64::new(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64,
+        ),
     });
 
     let app = Router::new()
