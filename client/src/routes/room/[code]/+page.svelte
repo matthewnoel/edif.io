@@ -78,6 +78,7 @@
 	let promptInputEl: HTMLInputElement | null = $state(null);
 	let copyConfirmed = $state(false);
 	let copyTimeout = 0;
+	let powerUpToastTimeout = 0;
 
 	let myActiveEffects = $derived(
 		(gs.room?.activePowerups ?? [])
@@ -147,6 +148,15 @@
 	$effect(() => {
 		if (gs.room?.prompt && promptInputEl) {
 			promptInputEl.focus();
+		}
+	});
+
+	$effect(() => {
+		if (gs.powerUpToast) {
+			clearTimeout(powerUpToastTimeout);
+			powerUpToastTimeout = window.setTimeout(() => {
+				gs.powerUpToast = null;
+			}, 3000);
 		}
 	});
 
@@ -292,10 +302,20 @@
 								</div>
 								<span class="other-offer-label" style:color={pu.playerColor}>
 									{pu.playerName} vying for {POWERUP_META[pu.kind].emoji}
+									{POWERUP_META[pu.kind].label}
 								</span>
 							</div>
 						{/each}
 					</div>
+				{/if}
+				{#if gs.powerUpToast}
+					{@const meta = POWERUP_META[gs.powerUpToast]}
+					{#key gs.powerUpToast}
+						<div class="powerup-toast">
+							{meta.emoji}
+							{meta.label}
+						</div>
+					{/key}
 				{/if}
 				<div class="input-row">
 					{#if myPendingPowerUps.length > 0}
@@ -546,6 +566,18 @@
 
 	.other-offer-label {
 		white-space: nowrap;
+	}
+
+	.powerup-toast {
+		text-align: center;
+		font-size: 1rem;
+		font-weight: 700;
+		padding: 0.35rem 0.75rem;
+		border-radius: 0.5rem;
+		background: #d1fae5;
+		color: #065f46;
+		animation: fade-in-out 3s ease forwards;
+		margin: 0 auto 0.4rem;
 	}
 
 	.active-effects {

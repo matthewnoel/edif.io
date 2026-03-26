@@ -78,7 +78,8 @@ export const gs = $state({
 	outboundCount: 0,
 	socketState: 'idle',
 	lastSocketDetail: '',
-	pendingPowerUps: [] as PendingPowerUp[]
+	pendingPowerUps: [] as PendingPowerUp[],
+	powerUpToast: null as PowerUpKind | null
 });
 
 let socket: WebSocket | null = null;
@@ -187,6 +188,9 @@ function handleServerMessage(message: ServerMessage): void {
 			const idx = gs.pendingPowerUps.findIndex((pu) => pu.offerId === message.offerId);
 			if (idx !== -1) {
 				gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
+			}
+			if (message.playerId === gs.playerId) {
+				gs.powerUpToast = message.kind;
 			}
 			break;
 		}
