@@ -43,6 +43,24 @@
 			label: '2x Points',
 			affectsSelf: true,
 			disablesInput: false
+		},
+		scrambleFont: {
+			emoji: '\u{1F92A}',
+			label: 'Scrambled!',
+			affectsSelf: false,
+			disablesInput: false
+		},
+		scoreSteal: {
+			emoji: '\u{1F422}',
+			label: 'Blue Shell!',
+			affectsSelf: true,
+			disablesInput: false
+		},
+		ongoingScoreSteal: {
+			emoji: '\u{1F355}',
+			label: 'Point Eater!',
+			affectsSelf: true,
+			disablesInput: false
 		}
 	};
 
@@ -74,6 +92,12 @@
 	);
 
 	let inputDisabled = $derived(myActiveEffects.some((e) => e.disablesInput));
+
+	let promptScrambled = $derived(
+		(gs.room?.activePowerups ?? []).some(
+			(pu) => pu.kind === 'scrambleFont' && pu.sourcePlayerId !== gs.playerId && pu.remainingMs > 0
+		)
+	);
 
 	let myColor = $derived(gs.room?.players.find((p) => p.id === gs.playerId)?.color ?? null);
 
@@ -151,6 +175,10 @@
 		}
 
 		const now = performance.now();
+		const expired = gs.pendingPowerUps.filter((pu) => pu.expiresAt <= now);
+		if (expired.length > 0) {
+			gs.pendingPowerUps = gs.pendingPowerUps.filter((pu) => pu.expiresAt > now);
+		}
 		const offsets: Record<number, number> = {};
 		for (const pu of gs.pendingPowerUps) {
 			const remaining = Math.max(0, pu.expiresAt - now);
@@ -227,7 +255,9 @@
 				</div>
 			{/if}
 			{#if gs.room?.prompt}
-				<div class="prompt"><strong>{gs.room?.prompt}</strong></div>
+				<div class="prompt" class:shizuru-regular={promptScrambled}>
+					<strong>{gs.room?.prompt}</strong>
+				</div>
 			{:else if !gs.room?.matchWinner}
 				<div class="prompt">
 					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>

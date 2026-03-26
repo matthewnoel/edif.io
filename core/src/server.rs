@@ -1,11 +1,13 @@
 use crate::adapter::{AdapterHandle, AdapterRegistry, build_adapter_registry};
 use crate::game::{
     DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
-    apply_wrong_answer_penalty, resolve_match_by_timer,
+    apply_wrong_answer_penalty, deduct_from_top_players, find_top_player_ids,
+    resolve_match_by_timer,
 };
 use crate::powerup::{
-    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpOffer, cleanup_expired, effect_duration,
-    has_double_points, is_player_frozen, offer_duration, pick_powerup_kind, pick_powerup_recipient,
+    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpKind, PowerUpOffer, cleanup_expired,
+    effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
+    pick_powerup_kind, pick_powerup_recipient,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
 use axum::Router;
@@ -513,6 +515,10 @@ async fn handle_submission(
                 });
                 should_advance_round = room.match_winner.is_none();
 
+                if has_ongoing_score_steal(&room.active_powerups, player_id) {
+                    deduct_from_top_players(room, growth, player_id);
+                }
+
                 let now = Instant::now();
                 let oldest_idx = room
                     .powerup_offers
@@ -536,6 +542,18 @@ async fn handle_submission(
                         kind: offer.kind,
                         duration_ms: duration.as_millis() as u64,
                     });
+
+                    if offer.kind == PowerUpKind::ScoreSteal {
+                        let top_ids = find_top_player_ids(&room.players, player_id);
+                        if let Some(&first) = top_ids.first() {
+                            let top_size = room.players.get(&first).map(|p| p.size).unwrap_or(0.0);
+                            let chunk = top_size * 0.10;
+                            let actual = deduct_from_top_players(room, chunk, player_id);
+                            if let Some(p) = room.players.get_mut(&player_id) {
+                                p.size += actual;
+                            }
+                        }
+                    }
                 }
             }
         }

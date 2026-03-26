@@ -187,6 +187,21 @@ describe('decodeServerMessage', () => {
 		expect(parsed?.type).toBe('powerUpEffectEnded');
 	});
 
+	it('parses powerUpOffered with new power-up kinds', () => {
+		for (const kind of ['scrambleFont', 'scoreSteal', 'ongoingScoreSteal']) {
+			const parsed = decodeServerMessage(
+				JSON.stringify({
+					type: 'powerUpOffered',
+					offerId: 1,
+					playerId: 1,
+					kind,
+					expiresInMs: 30000
+				})
+			);
+			expect(parsed?.type).toBe('powerUpOffered');
+		}
+	});
+
 	it('rejects powerUpOffered with invalid kind', () => {
 		const parsed = decodeServerMessage(
 			JSON.stringify({

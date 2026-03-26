@@ -6,7 +6,12 @@ export type ErrorCode =
 	| 'roomExpired'
 	| 'playerNotInRoom';
 
-export type PowerUpKind = 'freezeAllCompetitors' | 'doublePoints';
+export type PowerUpKind =
+	| 'freezeAllCompetitors'
+	| 'doublePoints'
+	| 'scrambleFont'
+	| 'scoreSteal'
+	| 'ongoingScoreSteal';
 
 export type ActivePowerUpSnapshot = {
 	kind: PowerUpKind;
@@ -103,7 +108,13 @@ function isErrorCode(value: unknown): value is ErrorCode {
 	return typeof value === 'string' && VALID_ERROR_CODES.includes(value as ErrorCode);
 }
 
-const VALID_POWERUP_KINDS: PowerUpKind[] = ['freezeAllCompetitors', 'doublePoints'];
+const VALID_POWERUP_KINDS: PowerUpKind[] = [
+	'freezeAllCompetitors',
+	'doublePoints',
+	'scrambleFont',
+	'scoreSteal',
+	'ongoingScoreSteal'
+];
 
 function isPowerUpKind(value: unknown): value is PowerUpKind {
 	return typeof value === 'string' && VALID_POWERUP_KINDS.includes(value as PowerUpKind);
