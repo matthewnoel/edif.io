@@ -292,25 +292,17 @@
 					<div class="other-offers">
 						{#each otherPendingPowerUps as pu (pu.offerId)}
 							<div class="other-offer-badge">
-								<div class="powerup-slot">
-									<svg class="countdown-ring" viewBox="0 0 40 40">
-										<circle class="ring-bg" r="17" cx="20" cy="20" />
-										<circle
-											class="ring-fg"
-											r="17"
-											cx="20"
-											cy="20"
-											stroke-dasharray={RING_CIRCUMFERENCE}
-											stroke-dashoffset={powerupRingOffsets[pu.offerId] ?? 0}
-											style:stroke={pu.playerColor}
-										/>
-									</svg>
-									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
-								</div>
+								<span class="other-offer-emoji">{POWERUP_META[pu.kind].emoji}</span>
 								<span class="other-offer-label" style:color={pu.playerColor}>
 									{pu.playerName} vying for
 									{POWERUP_META[pu.kind].label}
 								</span>
+								<div
+									class="other-offer-bar"
+									style:background={pu.playerColor}
+									style:width="{(1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE) *
+										100}%"
+								></div>
 							</div>
 						{/each}
 					</div>
@@ -553,7 +545,8 @@
 
 	.other-offers {
 		display: flex;
-		flex-wrap: wrap;
+		flex-direction: column;
+		align-items: center;
 		justify-content: center;
 		gap: 0.5rem;
 		margin: 0 auto;
@@ -562,18 +555,34 @@
 	}
 
 	.other-offer-badge {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
 		font-size: 0.85rem;
 		font-weight: 600;
-		padding: 0.2rem 0.5rem 0.2rem 0;
+		padding: 0.25rem 0.5rem 0.45rem;
 		border-radius: 0.4rem;
 		background: #f3f4f6;
+		overflow: hidden;
+	}
+
+	.other-offer-emoji {
+		font-size: 1.1rem;
+		line-height: 1;
 	}
 
 	.other-offer-label {
 		white-space: nowrap;
+	}
+
+	.other-offer-bar {
+		position: absolute;
+		left: 0;
+		bottom: 0;
+		height: 3px;
+		border-radius: 0 0 0.4rem 0.4rem;
+		transition: width 60ms linear;
 	}
 
 	.powerup-toast {
