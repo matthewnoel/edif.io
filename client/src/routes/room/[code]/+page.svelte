@@ -80,17 +80,19 @@
 	let copyTimeout = 0;
 	let powerUpToastTimeout = 0;
 
-	let myActiveEffects = $derived(
-		(gs.room?.activePowerups ?? [])
-			.filter((pu) => {
-				if (pu.remainingMs <= 0) return false;
-				const meta = POWERUP_META[pu.kind];
-				return meta.affectsSelf
-					? pu.sourcePlayerId === gs.playerId
-					: pu.sourcePlayerId !== gs.playerId;
-			})
-			.map((pu) => ({ ...POWERUP_META[pu.kind], kind: pu.kind }))
-	);
+	let myActiveEffects = $derived([
+		...new Map(
+			(gs.room?.activePowerups ?? [])
+				.filter((pu) => {
+					if (pu.remainingMs <= 0) return false;
+					const meta = POWERUP_META[pu.kind];
+					return meta.affectsSelf
+						? pu.sourcePlayerId === gs.playerId
+						: pu.sourcePlayerId !== gs.playerId;
+				})
+				.map((pu) => [pu.kind, { ...POWERUP_META[pu.kind], kind: pu.kind }] as const)
+		).values()
+	]);
 
 	let inputDisabled = $derived(myActiveEffects.some((e) => e.disablesInput));
 
@@ -114,14 +116,19 @@
 	);
 
 	function playerPowerUpEmojis(playerId: number): string {
-		return (gs.room?.activePowerups ?? [])
-			.filter((pu) => {
-				if (pu.remainingMs <= 0) return false;
-				const meta = POWERUP_META[pu.kind];
-				return meta.affectsSelf ? pu.sourcePlayerId === playerId : pu.sourcePlayerId !== playerId;
-			})
-			.map((pu) => POWERUP_META[pu.kind].emoji)
-			.join('');
+		return [
+			...new Set(
+				(gs.room?.activePowerups ?? [])
+					.filter((pu) => {
+						if (pu.remainingMs <= 0) return false;
+						const meta = POWERUP_META[pu.kind];
+						return meta.affectsSelf
+							? pu.sourcePlayerId === playerId
+							: pu.sourcePlayerId !== playerId;
+					})
+					.map((pu) => POWERUP_META[pu.kind].emoji)
+			)
+		].join('');
 	}
 
 	function formatTimer(ms: number): string {
@@ -301,7 +308,7 @@
 									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
 								</div>
 								<span class="other-offer-label" style:color={pu.playerColor}>
-									{pu.playerName} vying for {POWERUP_META[pu.kind].emoji}
+									{pu.playerName} vying for
 									{POWERUP_META[pu.kind].label}
 								</span>
 							</div>
@@ -384,7 +391,8 @@
 					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
 				>
 					<div class="name">{player.name}</div>
-					<div class="size">{playerPowerUpEmojis(player.id)}{player.size.toFixed(1)}</div>
+					<div class="powerup-emojis">{playerPowerUpEmojis(player.id)}</div>
+					<div class="size">{player.size.toFixed(1)}</div>
 					<div class="progress">{player.progress}</div>
 				</div>
 			{/each}
@@ -652,6 +660,11 @@
 	}
 
 	.name {
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.powerup-emojis {
 		font-size: 0.85rem;
 		font-weight: 600;
 	}
