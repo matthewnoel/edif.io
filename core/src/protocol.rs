@@ -98,6 +98,8 @@ pub enum ServerMessage {
     PowerUpOffered {
         #[serde(rename = "offerId")]
         offer_id: u64,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
         kind: PowerUpKind,
         #[serde(rename = "expiresInMs")]
         expires_in_ms: u64,
@@ -114,6 +116,8 @@ pub enum ServerMessage {
     PowerUpOfferExpired {
         #[serde(rename = "offerId")]
         offer_id: u64,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
         kind: PowerUpKind,
     },
     PowerUpEffectEnded {
@@ -172,12 +176,14 @@ mod tests {
     fn serializes_powerup_offered() {
         let msg = super::ServerMessage::PowerUpOffered {
             offer_id: 5,
+            player_id: 2,
             kind: super::PowerUpKind::FreezeAllCompetitors,
             expires_in_ms: 30000,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpOffered""#));
         assert!(json.contains(r#""offerId":5"#));
+        assert!(json.contains(r#""playerId":2"#));
         assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
         assert!(json.contains(r#""expiresInMs":30000"#));
     }
@@ -202,11 +208,13 @@ mod tests {
     fn serializes_powerup_offer_expired() {
         let msg = super::ServerMessage::PowerUpOfferExpired {
             offer_id: 7,
+            player_id: 3,
             kind: super::PowerUpKind::DoublePoints,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpOfferExpired""#));
         assert!(json.contains(r#""offerId":7"#));
+        assert!(json.contains(r#""playerId":3"#));
         assert!(json.contains(r#""kind":"doublePoints""#));
     }
 

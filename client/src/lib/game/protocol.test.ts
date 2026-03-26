@@ -143,6 +143,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpOffered',
 				offerId: 5,
+				playerId: 2,
 				kind: 'freezeAllCompetitors',
 				expiresInMs: 30000
 			})
@@ -168,6 +169,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpOfferExpired',
 				offerId: 7,
+				playerId: 3,
 				kind: 'doublePoints'
 			})
 		);
@@ -190,6 +192,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpOffered',
 				offerId: 0,
+				playerId: 1,
 				kind: 'unknownPowerUp',
 				expiresInMs: 30000
 			})

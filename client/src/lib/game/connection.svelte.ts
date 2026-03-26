@@ -56,7 +56,12 @@ function normalizeRoomCode(value: string): string {
 	return value.trim().toUpperCase();
 }
 
-export type PendingPowerUp = { offerId: number; kind: PowerUpKind; expiresAt: number };
+export type PendingPowerUp = {
+	offerId: number;
+	playerId: number;
+	kind: PowerUpKind;
+	expiresAt: number;
+};
 
 export const gs = $state({
 	phase: 'pregame' as ConnectionPhase,
@@ -165,6 +170,7 @@ function handleServerMessage(message: ServerMessage): void {
 				...gs.pendingPowerUps,
 				{
 					offerId: message.offerId,
+					playerId: message.playerId,
 					kind: message.kind,
 					expiresAt: performance.now() + message.expiresInMs
 				}
@@ -177,14 +183,13 @@ function handleServerMessage(message: ServerMessage): void {
 			}
 			break;
 		}
-		case 'powerUpActivated':
-			if (message.playerId === gs.playerId) {
-				const idx = gs.pendingPowerUps.findIndex((pu) => pu.offerId === message.offerId);
-				if (idx !== -1) {
-					gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
-				}
+		case 'powerUpActivated': {
+			const idx = gs.pendingPowerUps.findIndex((pu) => pu.offerId === message.offerId);
+			if (idx !== -1) {
+				gs.pendingPowerUps = gs.pendingPowerUps.toSpliced(idx, 1);
 			}
 			break;
+		}
 		case 'powerUpEffectEnded':
 			break;
 	}

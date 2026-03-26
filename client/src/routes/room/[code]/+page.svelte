@@ -77,6 +77,28 @@
 
 	let myColor = $derived(gs.room?.players.find((p) => p.id === gs.playerId)?.color ?? null);
 
+	let myPendingPowerUps = $derived(gs.pendingPowerUps.filter((pu) => pu.playerId === gs.playerId));
+
+	let otherPendingPowerUps = $derived(
+		gs.pendingPowerUps
+			.filter((pu) => pu.playerId !== gs.playerId)
+			.map((pu) => {
+				const player = gs.room?.players.find((p) => p.id === pu.playerId);
+				return { ...pu, playerName: player?.name ?? '???', playerColor: player?.color ?? '#888' };
+			})
+	);
+
+	function playerPowerUpEmojis(playerId: number): string {
+		return (gs.room?.activePowerups ?? [])
+			.filter((pu) => {
+				if (pu.remainingMs <= 0) return false;
+				const meta = POWERUP_META[pu.kind];
+				return meta.affectsSelf ? pu.sourcePlayerId === playerId : pu.sourcePlayerId !== playerId;
+			})
+			.map((pu) => POWERUP_META[pu.kind].emoji)
+			.join('');
+	}
+
 	function formatTimer(ms: number): string {
 		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
 		const m = Math.floor(totalSeconds / 60);
@@ -130,12 +152,11 @@
 
 		const now = performance.now();
 		const offsets: Record<number, number> = {};
-		for (let i = 0; i < gs.pendingPowerUps.length; i++) {
-			const pu = gs.pendingPowerUps[i];
+		for (const pu of gs.pendingPowerUps) {
 			const remaining = Math.max(0, pu.expiresAt - now);
 			const total = 30_000;
 			const fraction = remaining / total;
-			offsets[i] = RING_CIRCUMFERENCE * (1 - fraction);
+			offsets[pu.offerId] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;
 
@@ -220,10 +241,10 @@
 					</div>
 				</div>
 			{:else}
-				<div class="input-row">
-					{#if gs.pendingPowerUps.length > 0}
-						<div class="powerup-tray">
-							{#each gs.pendingPowerUps as pu, i (pu.offerId)}
+				{#if otherPendingPowerUps.length > 0}
+					<div class="other-offers">
+						{#each otherPendingPowerUps as pu (pu.offerId)}
+							<div class="other-offer-badge">
 								<div class="powerup-slot">
 									<svg class="countdown-ring" viewBox="0 0 40 40">
 										<circle class="ring-bg" r="17" cx="20" cy="20" />
@@ -233,7 +254,33 @@
 											cx="20"
 											cy="20"
 											stroke-dasharray={RING_CIRCUMFERENCE}
-											stroke-dashoffset={powerupRingOffsets[i] ?? 0}
+											stroke-dashoffset={powerupRingOffsets[pu.offerId] ?? 0}
+											style:stroke={pu.playerColor}
+										/>
+									</svg>
+									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
+								</div>
+								<span class="other-offer-label" style:color={pu.playerColor}>
+									{pu.playerName} vying for {POWERUP_META[pu.kind].emoji}
+								</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+				<div class="input-row">
+					{#if myPendingPowerUps.length > 0}
+						<div class="powerup-tray">
+							{#each myPendingPowerUps as pu (pu.offerId)}
+								<div class="powerup-slot">
+									<svg class="countdown-ring" viewBox="0 0 40 40">
+										<circle class="ring-bg" r="17" cx="20" cy="20" />
+										<circle
+											class="ring-fg"
+											r="17"
+											cx="20"
+											cy="20"
+											stroke-dasharray={RING_CIRCUMFERENCE}
+											stroke-dashoffset={powerupRingOffsets[pu.offerId] ?? 0}
 											style:stroke={myColor}
 										/>
 									</svg>
@@ -287,7 +334,7 @@
 					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
 				>
 					<div class="name">{player.name}</div>
-					<div class="size">{player.size.toFixed(1)}</div>
+					<div class="size">{playerPowerUpEmojis(player.id)}{player.size.toFixed(1)}</div>
 					<div class="progress">{player.progress}</div>
 				</div>
 			{/each}
@@ -444,6 +491,31 @@
 		font-size: 1.2rem;
 		line-height: 1;
 		z-index: 1;
+	}
+
+	.other-offers {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem;
+		margin: 0 auto;
+		max-width: 480px;
+		width: 100%;
+	}
+
+	.other-offer-badge {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 0.2rem 0.5rem 0.2rem 0;
+		border-radius: 0.4rem;
+		background: #f3f4f6;
+	}
+
+	.other-offer-label {
+		white-space: nowrap;
 	}
 
 	.active-effects {

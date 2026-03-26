@@ -680,9 +680,9 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                 break;
             }
 
-            let mut expired_offer_notifs: Vec<(PlayerId, ServerMessage)> = Vec::new();
+            let mut expired_offer_notifs: Vec<ServerMessage> = Vec::new();
             let mut expired_effect_broadcasts: Vec<ServerMessage> = Vec::new();
-            let mut new_offer_notif: Option<(PlayerId, ServerMessage)> = None;
+            let mut new_offer_notif: Option<ServerMessage> = None;
 
             {
                 let mut rooms = state.rooms.lock().await;
@@ -697,13 +697,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                     cleanup_expired(&mut room.powerup_offers, &mut room.active_powerups, now);
 
                 for offer in &expired.expired_offers {
-                    expired_offer_notifs.push((
-                        offer.player_id,
-                        ServerMessage::PowerUpOfferExpired {
-                            offer_id: offer.offer_id,
-                            kind: offer.kind,
-                        },
-                    ));
+                    expired_offer_notifs.push(ServerMessage::PowerUpOfferExpired {
+                        offer_id: offer.offer_id,
+                        player_id: offer.player_id,
+                        kind: offer.kind,
+                    });
                 }
                 for effect in &expired.expired_effects {
                     expired_effect_broadcasts.push(ServerMessage::PowerUpEffectEnded {
@@ -732,19 +730,17 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                         expires_at,
                     });
                     let expires_in_ms = offer_duration().as_millis() as u64;
-                    new_offer_notif = Some((
-                        recipient,
-                        ServerMessage::PowerUpOffered {
-                            offer_id,
-                            kind,
-                            expires_in_ms,
-                        },
-                    ));
+                    new_offer_notif = Some(ServerMessage::PowerUpOffered {
+                        offer_id,
+                        player_id: recipient,
+                        kind,
+                        expires_in_ms,
+                    });
                 }
             }
 
-            for (player_id, msg) in expired_offer_notifs {
-                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            for msg in expired_offer_notifs {
+                let _ = broadcast_to_room(&state, &room_code, &msg).await;
             }
             let had_expired_effects = !expired_effect_broadcasts.is_empty();
             for msg in expired_effect_broadcasts {
@@ -753,27 +749,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
             if had_expired_effects {
                 let _ = broadcast_room_state(&state, &room_code).await;
             }
-            if let Some((player_id, msg)) = new_offer_notif {
-                let _ = send_to_player(&state, &room_code, player_id, &msg).await;
+            if let Some(msg) = new_offer_notif {
+                let _ = broadcast_to_room(&state, &room_code, &msg).await;
             }
         }
     });
-}
-
-async fn send_to_player(
-    state: &Arc<SharedState>,
-    room_code: &str,
-    player_id: PlayerId,
-    message: &ServerMessage,
-) -> bool {
-    let connections = state.connections.lock().await;
-    let Some(room_connections) = connections.get(room_code) else {
-        return false;
-    };
-    let Some(conn) = room_connections.get(&player_id) else {
-        return false;
-    };
-    send_server_message(&conn.sender, message).is_ok()
 }
 
 async fn disconnect_player(state: &Arc<SharedState>, room_code: &str, player_id: PlayerId) {

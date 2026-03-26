@@ -69,7 +69,13 @@ export type ServerMessage =
 	  }
 	| { type: 'wrongAnswer'; roomCode: string; playerId: number; shrinkApplied: number }
 	| { type: 'error'; message: string; code?: ErrorCode }
-	| { type: 'powerUpOffered'; offerId: number; kind: PowerUpKind; expiresInMs: number }
+	| {
+			type: 'powerUpOffered';
+			offerId: number;
+			playerId: number;
+			kind: PowerUpKind;
+			expiresInMs: number;
+	  }
 	| {
 			type: 'powerUpActivated';
 			offerId: number;
@@ -77,7 +83,7 @@ export type ServerMessage =
 			kind: PowerUpKind;
 			durationMs: number;
 	  }
-	| { type: 'powerUpOfferExpired'; offerId: number; kind: PowerUpKind }
+	| { type: 'powerUpOfferExpired'; offerId: number; playerId: number; kind: PowerUpKind }
 	| { type: 'powerUpEffectEnded'; playerId: number; kind: PowerUpKind };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -186,6 +192,7 @@ function isServerMessage(value: unknown): value is ServerMessage {
 		case 'powerUpOffered':
 			return (
 				typeof value.offerId === 'number' &&
+				typeof value.playerId === 'number' &&
 				isPowerUpKind(value.kind) &&
 				typeof value.expiresInMs === 'number'
 			);
@@ -197,7 +204,11 @@ function isServerMessage(value: unknown): value is ServerMessage {
 				typeof value.durationMs === 'number'
 			);
 		case 'powerUpOfferExpired':
-			return typeof value.offerId === 'number' && isPowerUpKind(value.kind);
+			return (
+				typeof value.offerId === 'number' &&
+				typeof value.playerId === 'number' &&
+				isPowerUpKind(value.kind)
+			);
 		case 'powerUpEffectEnded':
 			return typeof value.playerId === 'number' && isPowerUpKind(value.kind);
 		default:
