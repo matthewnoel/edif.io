@@ -58,12 +58,15 @@
 </script>
 
 <main>
-	<form class="pregame" onsubmit={(e) => {
-		e.preventDefault();
-		if (gs.phase === 'connecting') return;
-		if (code) joinRoom();
-		else createRoom();
-	}}>
+	<form
+		class="pregame"
+		onsubmit={(e) => {
+			e.preventDefault();
+			if (gs.phase === 'connecting') return;
+			if (code) joinRoom();
+			else createRoom();
+		}}
+	>
 		<h1 class="shizuru-regular">edif.io</h1>
 		{#if debugMode}
 			<label>
