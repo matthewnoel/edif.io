@@ -58,7 +58,12 @@
 </script>
 
 <main>
-	<div class="pregame">
+	<form class="pregame" onsubmit={(e) => {
+		e.preventDefault();
+		if (gs.phase === 'connecting') return;
+		if (code) joinRoom();
+		else createRoom();
+	}}>
 		<h1 class="shizuru-regular">edif.io</h1>
 		{#if debugMode}
 			<label>
@@ -122,6 +127,7 @@
 				spellcheck="false"
 			/>
 		</label>
+		<button type="submit" hidden aria-hidden="true"></button>
 		<div class="buttons">
 			<Button
 				label="Create Room"
@@ -139,7 +145,7 @@
 				<p class="meta">{gs.lastSocketDetail}</p>
 			{/if}
 		{/if}
-	</div>
+	</form>
 </main>
 
 <style>
