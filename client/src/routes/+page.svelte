@@ -2,41 +2,101 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		gs,
-		connect,
-		setOnWelcome,
-		defaultWsUrl,
-		type GameMode
-	} from '$lib/game/connection.svelte';
+	import { gs, connect, setOnWelcome, defaultWsUrl } from '$lib/game/connection.svelte';
+	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
+	import Checkbox from '$lib/components/Checkbox.svelte';
+	import RangeInput from '$lib/components/RangeInput.svelte';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let playerName = $state('');
 	let roomCodeInput = $state('');
-	let selectedGameMode = $state<GameMode>('keyboarding');
+	let selectedGameMode = $state('');
 	let matchDuration = $state('60');
+	let gameModes = $state<GameModeInfo[]>([]);
+	let gameOptionValues = $state<Record<string, string>>({});
 	let code = $derived(roomCodeInput);
 
-	onMount(() => {
+	let selectedMode = $derived(gameModes.find((m) => m.key === selectedGameMode));
+
+	let visibleOptions = $derived.by(() => {
+		if (!selectedMode?.options.length) return [];
+		return selectedMode.options.filter((opt) => {
+			if (!opt.visibleWhen) return true;
+			return gameOptionValues[opt.visibleWhen.key] === opt.visibleWhen.value;
+		});
+	});
+
+	const RANGE_PAIRS: [string, string][] = [
+		['firstTermMinimumDigits', 'firstTermMaximumDigits'],
+		['secondTermMinimumDigits', 'secondTermMaximumDigits']
+	];
+
+	function initOptionDefaults(mode: GameModeInfo | undefined): void {
+		if (!mode || mode.options.length === 0) {
+			gameOptionValues = {};
+			return;
+		}
+		const defaults: Record<string, string> = {};
+		for (const opt of mode.options) {
+			defaults[opt.key] = gameOptionValues[opt.key] ?? String(opt.default);
+		}
+		gameOptionValues = defaults;
+	}
+
+	function handleRangeChange(key: string, value: string): void {
+		gameOptionValues = { ...gameOptionValues, [key]: value };
+		for (const [minKey, maxKey] of RANGE_PAIRS) {
+			const min = parseInt(gameOptionValues[minKey] ?? '1');
+			const max = parseInt(gameOptionValues[maxKey] ?? '1');
+			if (key === minKey && min > max) {
+				gameOptionValues = { ...gameOptionValues, [maxKey]: value };
+			} else if (key === maxKey && max < min) {
+				gameOptionValues = { ...gameOptionValues, [minKey]: value };
+			}
+		}
+	}
+
+	onMount(async () => {
 		wsUrl = defaultWsUrl();
 		setOnWelcome((roomCode) => {
 			goto(resolve(`/room/${roomCode}`));
 		});
+
+		try {
+			const res = await fetch('/api/game-modes');
+			if (res.ok) {
+				const modes: GameModeInfo[] = await res.json();
+				gameModes = modes;
+				if (modes.length > 0 && !selectedGameMode) {
+					selectedGameMode = modes[0].key;
+					initOptionDefaults(modes[0]);
+				}
+			}
+		} catch {
+			/* server may not be running yet during dev */
+		}
 	});
 
 	onDestroy(() => {
 		setOnWelcome(null);
 	});
 
+	function handleGameModeChange(newMode: string): void {
+		selectedGameMode = newMode;
+		initOptionDefaults(gameModes.find((m) => m.key === newMode));
+	}
+
 	function createRoom(): void {
+		const hasOptions = Object.keys(gameOptionValues).length > 0;
 		connect(wsUrl, {
 			playerName,
 			gameMode: selectedGameMode,
-			matchDurationSecs: parseInt(matchDuration) || 60
+			matchDurationSecs: parseInt(matchDuration) || 60,
+			gameOptions: hasOptions ? gameOptionValues : undefined
 		});
 	}
 
@@ -58,7 +118,15 @@
 </script>
 
 <main>
-	<div class="pregame">
+	<form
+		class="pregame"
+		onsubmit={(e) => {
+			e.preventDefault();
+			if (gs.phase === 'connecting') return;
+			if (code) joinRoom();
+			else createRoom();
+		}}
+	>
 		<h1 class="shizuru-regular">edif.io</h1>
 		{#if debugMode}
 			<label>
@@ -73,16 +141,56 @@
 				/>
 			</label>
 		{/if}
-		<label>
-			<strong>Game Mode:</strong>
-			<Select
-				bind:value={selectedGameMode}
-				options={[
-					{ value: 'keyboarding', label: 'Keyboarding' },
-					{ value: 'arithmetic', label: 'Arithmetic' }
-				]}
-			/>
-		</label>
+		{#if gameModes.length > 0}
+			<label>
+				<strong>Game Mode:</strong>
+				<Select
+					value={selectedGameMode}
+					onchange={(e) => handleGameModeChange(e.currentTarget.value)}
+					options={gameModes.map((m) => ({ value: m.key, label: m.label }))}
+				/>
+			</label>
+		{/if}
+		{#if visibleOptions.length}
+			{#each visibleOptions as opt (opt.key)}
+				{#if opt.type === 'select'}
+					<label>
+						<strong>{opt.label}:</strong>
+						<Select
+							value={gameOptionValues[opt.key] ?? opt.default}
+							onchange={(e) => {
+								gameOptionValues = { ...gameOptionValues, [opt.key]: e.currentTarget.value };
+							}}
+							options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
+						/>
+					</label>
+				{:else if opt.type === 'range'}
+					<label>
+						<strong>{opt.label} ({gameOptionValues[opt.key] ?? opt.default}):</strong>
+						<RangeInput
+							min={opt.min}
+							max={opt.max}
+							step={opt.step}
+							value={gameOptionValues[opt.key] ?? String(opt.default)}
+							oninput={(e) => handleRangeChange(opt.key, e.currentTarget.value)}
+						/>
+					</label>
+				{:else if opt.type === 'toggle'}
+					<label class="toggle">
+						<Checkbox
+							checked={gameOptionValues[opt.key] === 'true'}
+							onchange={(e) => {
+								gameOptionValues = {
+									...gameOptionValues,
+									[opt.key]: String(e.currentTarget.checked)
+								};
+							}}
+						/>
+						<strong>{opt.label}</strong>
+					</label>
+				{/if}
+			{/each}
+		{/if}
 		<label>
 			<strong>Match Duration in Seconds:</strong>
 			<TextInput
@@ -122,6 +230,7 @@
 				spellcheck="false"
 			/>
 		</label>
+		<button type="submit" hidden aria-hidden="true"></button>
 		<div class="buttons">
 			<Button
 				label="Create Room"
@@ -139,7 +248,7 @@
 				<p class="meta">{gs.lastSocketDetail}</p>
 			{/if}
 		{/if}
-	</div>
+	</form>
 </main>
 
 <style>
@@ -168,6 +277,11 @@
 		display: grid;
 		gap: 0.25rem;
 		font-size: 0.92rem;
+	}
+
+	label.toggle {
+		grid-template-columns: auto 1fr;
+		align-items: center;
 	}
 
 	.buttons {

@@ -1,3 +1,5 @@
+ARG NODE_VERSION
+
 FROM rust:1 AS rust-builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
@@ -6,7 +8,7 @@ COPY adapters ./adapters
 COPY server ./server
 RUN cargo build -p server --release
 
-FROM node:22-slim AS node-builder
+FROM node:${NODE_VERSION}-slim AS node-builder
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm ci
@@ -15,7 +17,7 @@ RUN npm run build
 
 FROM caddy:2 AS caddy
 
-FROM node:22-slim
+FROM node:${NODE_VERSION}-slim
 RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
 COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
 COPY --from=rust-builder /build/target/release/server /usr/local/bin/server

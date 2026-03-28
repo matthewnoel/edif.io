@@ -8,14 +8,13 @@ import {
 } from './protocol';
 
 export type ConnectionPhase = 'pregame' | 'connecting' | 'ingame';
-export type GameMode = 'keyboarding' | 'arithmetic';
 
 const SESSION_KEY = 'edifio-connection';
 const REJOIN_PREFIX = 'edifio-rejoin-';
 
 type SessionData = {
 	playerName: string;
-	gameMode: GameMode;
+	gameMode: string;
 	wsUrl: string;
 };
 
@@ -206,8 +205,9 @@ export function connect(
 	opts?: {
 		roomCode?: string;
 		playerName?: string;
-		gameMode?: GameMode;
+		gameMode?: string;
 		matchDurationSecs?: number;
+		gameOptions?: Record<string, string>;
 		rejoinToken?: string;
 	}
 ): void {
@@ -223,7 +223,7 @@ export function connect(
 
 	saveSession({
 		playerName: opts?.playerName ?? '',
-		gameMode: opts?.gameMode ?? 'keyboarding',
+		gameMode: opts?.gameMode ?? '',
 		wsUrl
 	});
 
@@ -240,12 +240,14 @@ export function connect(
 		if (opts?.rejoinToken) {
 			sendClientMessage({ type: 'rejoinRoom', rejoinToken: opts.rejoinToken });
 		} else {
+			const hasOptions = opts?.gameOptions && Object.keys(opts.gameOptions).length > 0;
 			sendClientMessage({
 				type: 'joinOrCreateRoom',
 				playerName: opts?.playerName?.trim() || undefined,
 				roomCode: opts?.roomCode ? normalizeRoomCode(opts.roomCode) : undefined,
-				gameMode: opts?.gameMode,
-				matchDurationSecs: opts?.matchDurationSecs
+				gameMode: opts?.gameMode || undefined,
+				matchDurationSecs: opts?.matchDurationSecs,
+				gameOptions: hasOptions ? opts!.gameOptions : undefined
 			});
 		}
 	};

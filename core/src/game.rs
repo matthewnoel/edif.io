@@ -60,6 +60,7 @@ pub struct RoomSnapshot {
 pub struct RoomState {
     pub room_code: String,
     pub game_key: String,
+    pub game_options: serde_json::Value,
     pub players: HashMap<PlayerId, PlayerState>,
     pub prompt: String,
     pub round_id: u64,
@@ -230,6 +231,7 @@ mod tests {
         RoomState {
             room_code: "ABCD".to_string(),
             game_key: "keyboarding".to_string(),
+            game_options: serde_json::Value::Null,
             players: HashMap::from([(1, player(1, 10.0)), (2, player(2, 10.0))]),
             prompt: "abc".to_string(),
             round_id: 1,

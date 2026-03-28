@@ -40,6 +40,49 @@ export type RoomSnapshot = {
 	activePowerups: ActivePowerUpSnapshot[];
 };
 
+export type SelectChoice = {
+	value: string;
+	label: string;
+};
+
+export type VisibleWhen = {
+	key: string;
+	value: string;
+};
+
+export type OptionField =
+	| {
+			key: string;
+			label: string;
+			type: 'select';
+			choices: SelectChoice[];
+			default: string;
+			visibleWhen?: VisibleWhen;
+	  }
+	| {
+			key: string;
+			label: string;
+			type: 'range';
+			min: number;
+			max: number;
+			step: number;
+			default: number;
+			visibleWhen?: VisibleWhen;
+	  }
+	| {
+			key: string;
+			label: string;
+			type: 'toggle';
+			default: boolean;
+			visibleWhen?: VisibleWhen;
+	  };
+
+export type GameModeInfo = {
+	key: string;
+	label: string;
+	options: OptionField[];
+};
+
 export type ClientMessage =
 	| {
 			type: 'joinOrCreateRoom';
@@ -47,6 +90,7 @@ export type ClientMessage =
 			roomCode?: string;
 			gameMode?: string;
 			matchDurationSecs?: number;
+			gameOptions?: Record<string, string>;
 	  }
 	| { type: 'rejoinRoom'; rejoinToken: string }
 	| { type: 'inputUpdate'; text: string }
