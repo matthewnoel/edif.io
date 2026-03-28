@@ -49,4 +49,10 @@ make test
  ## Deployment
 
 The app is containerized via the `Dockerfile` and uses Caddy as a reverse proxy.
-It can be deployed to any Docker-capable host. A deployment is maintained by Plunge Studios at [edif.io](https://edif.io), but you're free to make, modify, and deploy your own versions if you wish.
+The Node version is sourced from `client/.nvmrc` and passed as a Docker build arg.
+
+```sh
+make build
+```
+
+The image can be deployed to any Docker-capable host. A deployment is maintained by Plunge Studios at [edif.io](https://edif.io), but you're free to make, modify, and deploy your own versions if you wish.
