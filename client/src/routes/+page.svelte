@@ -8,6 +8,8 @@
 	import Button from '$lib/components/Button.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
+	import Checkbox from '$lib/components/Checkbox.svelte';
+	import RangeInput from '$lib/components/RangeInput.svelte';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let playerName = $state('');
@@ -183,8 +185,7 @@
 				{:else if opt.type === 'range'}
 					<label>
 						<strong>{opt.label} ({gameOptionValues[opt.key] ?? opt.default}):</strong>
-						<input
-							type="range"
+						<RangeInput
 							min={rangeMin(opt, opt.key)}
 							max={rangeMax(opt, opt.key)}
 							step={opt.step}
@@ -194,8 +195,7 @@
 					</label>
 				{:else if opt.type === 'toggle'}
 					<label class="toggle">
-						<input
-							type="checkbox"
+						<Checkbox
 							checked={gameOptionValues[opt.key] === 'true'}
 							onchange={(e) => {
 								gameOptionValues = {
