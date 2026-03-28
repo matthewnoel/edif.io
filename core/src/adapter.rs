@@ -9,6 +9,8 @@ pub struct OptionField {
     pub label: String,
     #[serde(flatten)]
     pub kind: OptionFieldKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible_when: Option<VisibleWhen>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -18,6 +20,15 @@ pub enum OptionFieldKind {
         choices: Vec<SelectChoice>,
         default: String,
     },
+    Range {
+        min: i32,
+        max: i32,
+        step: i32,
+        default: i32,
+    },
+    Toggle {
+        default: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -25,6 +36,13 @@ pub enum OptionFieldKind {
 pub struct SelectChoice {
     pub value: String,
     pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisibleWhen {
+    pub key: String,
+    pub value: String,
 }
 
 pub trait GameAdapter: Send + Sync + 'static {

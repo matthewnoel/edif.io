@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
 	import { gs, connect, setOnWelcome, defaultWsUrl } from '$lib/game/connection.svelte';
-	import type { GameModeInfo } from '$lib/game/protocol';
+	import type { GameModeInfo, OptionField } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import Select from '$lib/components/Select.svelte';
@@ -20,6 +20,19 @@
 
 	let selectedMode = $derived(gameModes.find((m) => m.key === selectedGameMode));
 
+	let visibleOptions = $derived.by(() => {
+		if (!selectedMode?.options.length) return [];
+		return selectedMode.options.filter((opt) => {
+			if (!opt.visibleWhen) return true;
+			return gameOptionValues[opt.visibleWhen.key] === opt.visibleWhen.value;
+		});
+	});
+
+	const RANGE_PAIRS: [string, string][] = [
+		['firstTermMinimumDigits', 'firstTermMaximumDigits'],
+		['secondTermMinimumDigits', 'secondTermMaximumDigits']
+	];
+
 	function initOptionDefaults(mode: GameModeInfo | undefined): void {
 		if (!mode || mode.options.length === 0) {
 			gameOptionValues = {};
@@ -27,9 +40,40 @@
 		}
 		const defaults: Record<string, string> = {};
 		for (const opt of mode.options) {
-			defaults[opt.key] = gameOptionValues[opt.key] ?? opt.default;
+			defaults[opt.key] = gameOptionValues[opt.key] ?? String(opt.default);
 		}
 		gameOptionValues = defaults;
+	}
+
+	function handleRangeChange(key: string, value: string): void {
+		gameOptionValues = { ...gameOptionValues, [key]: value };
+		for (const [minKey, maxKey] of RANGE_PAIRS) {
+			const min = parseInt(gameOptionValues[minKey] ?? '1');
+			const max = parseInt(gameOptionValues[maxKey] ?? '1');
+			if (key === minKey && min > max) {
+				gameOptionValues = { ...gameOptionValues, [maxKey]: value };
+			} else if (key === maxKey && max < min) {
+				gameOptionValues = { ...gameOptionValues, [minKey]: value };
+			}
+		}
+	}
+
+	function rangeMax(opt: OptionField & { type: 'range' }, key: string): number {
+		for (const [minKey, maxKey] of RANGE_PAIRS) {
+			if (key === minKey) {
+				return parseInt(gameOptionValues[maxKey] ?? String(opt.max));
+			}
+		}
+		return opt.max;
+	}
+
+	function rangeMin(opt: OptionField & { type: 'range' }, key: string): number {
+		for (const [minKey, maxKey] of RANGE_PAIRS) {
+			if (key === maxKey) {
+				return parseInt(gameOptionValues[minKey] ?? String(opt.min));
+			}
+		}
+		return opt.min;
 	}
 
 	onMount(async () => {
@@ -123,18 +167,46 @@
 				/>
 			</label>
 		{/if}
-		{#if selectedMode?.options.length}
-			{#each selectedMode.options as opt (opt.key)}
-				<label>
-					<strong>{opt.label}:</strong>
-					<Select
-						value={gameOptionValues[opt.key] ?? opt.default}
-						onchange={(e) => {
-							gameOptionValues = { ...gameOptionValues, [opt.key]: e.currentTarget.value };
-						}}
-						options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
-					/>
-				</label>
+		{#if visibleOptions.length}
+			{#each visibleOptions as opt (opt.key)}
+				{#if opt.type === 'select'}
+					<label>
+						<strong>{opt.label}:</strong>
+						<Select
+							value={gameOptionValues[opt.key] ?? opt.default}
+							onchange={(e) => {
+								gameOptionValues = { ...gameOptionValues, [opt.key]: e.currentTarget.value };
+							}}
+							options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
+						/>
+					</label>
+				{:else if opt.type === 'range'}
+					<label>
+						<strong>{opt.label} ({gameOptionValues[opt.key] ?? opt.default}):</strong>
+						<input
+							type="range"
+							min={rangeMin(opt, opt.key)}
+							max={rangeMax(opt, opt.key)}
+							step={opt.step}
+							value={gameOptionValues[opt.key] ?? String(opt.default)}
+							oninput={(e) => handleRangeChange(opt.key, e.currentTarget.value)}
+						/>
+					</label>
+				{:else if opt.type === 'toggle'}
+					<label class="toggle">
+						<input
+							type="checkbox"
+							checked={gameOptionValues[opt.key] === 'true'}
+							onchange={(e) => {
+								gameOptionValues = {
+									...gameOptionValues,
+									[opt.key]: String(e.currentTarget.checked)
+								};
+							}}
+						/>
+						<strong>{opt.label}</strong>
+					</label>
+				{/if}
 			{/each}
 		{/if}
 		<label>
@@ -223,6 +295,11 @@
 		display: grid;
 		gap: 0.25rem;
 		font-size: 0.92rem;
+	}
+
+	label.toggle {
+		grid-template-columns: auto 1fr;
+		align-items: center;
 	}
 
 	.buttons {

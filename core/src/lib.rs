@@ -4,5 +4,7 @@ pub mod powerup;
 pub mod protocol;
 pub mod server;
 
-pub use adapter::{AdapterHandle, GameAdapter, OptionField, OptionFieldKind, SelectChoice};
+pub use adapter::{
+    AdapterHandle, GameAdapter, OptionField, OptionFieldKind, SelectChoice, VisibleWhen,
+};
 pub use server::{ServerConfig, run_server};

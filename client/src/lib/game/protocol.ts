@@ -45,13 +45,37 @@ export type SelectChoice = {
 	label: string;
 };
 
-export type OptionField = {
+export type VisibleWhen = {
 	key: string;
-	label: string;
-	type: 'select';
-	choices: SelectChoice[];
-	default: string;
+	value: string;
 };
+
+export type OptionField =
+	| {
+			key: string;
+			label: string;
+			type: 'select';
+			choices: SelectChoice[];
+			default: string;
+			visibleWhen?: VisibleWhen;
+	  }
+	| {
+			key: string;
+			label: string;
+			type: 'range';
+			min: number;
+			max: number;
+			step: number;
+			default: number;
+			visibleWhen?: VisibleWhen;
+	  }
+	| {
+			key: string;
+			label: string;
+			type: 'toggle';
+			default: boolean;
+			visibleWhen?: VisibleWhen;
+	  };
 
 export type GameModeInfo = {
 	key: string;
