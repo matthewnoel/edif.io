@@ -166,7 +166,10 @@ mod tests {
         let adapter = ArithmeticAdapter;
         let opts = serde_json::json!({"operation": "subtraction"});
         let prompt = adapter.next_prompt(42, &opts);
-        assert!(prompt.contains('-'), "prompt should contain minus: {prompt}");
+        assert!(
+            prompt.contains('-'),
+            "prompt should contain minus: {prompt}"
+        );
     }
 
     #[test]
@@ -176,7 +179,10 @@ mod tests {
         for seed in 0..200 {
             let prompt = adapter.next_prompt(seed, &opts);
             let result = eval_prompt(&prompt).expect("valid prompt");
-            assert!(result >= 0, "subtraction result should be non-negative: {prompt} = {result}");
+            assert!(
+                result >= 0,
+                "subtraction result should be non-negative: {prompt} = {result}"
+            );
         }
     }
 
@@ -191,7 +197,10 @@ mod tests {
             let left: i32 = parts[0].trim().parse().unwrap();
             let right: i32 = parts[1].trim().parse().unwrap();
             assert!((10..=99).contains(&left), "left {left} should be 2-digit");
-            assert!((10..=99).contains(&right), "right {right} should be 2-digit");
+            assert!(
+                (10..=99).contains(&right),
+                "right {right} should be 2-digit"
+            );
         }
     }
 

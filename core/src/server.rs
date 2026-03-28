@@ -113,9 +113,7 @@ struct GameModeInfo {
     options: Vec<OptionField>,
 }
 
-async fn game_modes_handler(
-    State(state): State<Arc<SharedState>>,
-) -> Json<Vec<GameModeInfo>> {
+async fn game_modes_handler(State(state): State<Arc<SharedState>>) -> Json<Vec<GameModeInfo>> {
     let modes = state
         .adapter_order
         .iter()
@@ -1114,10 +1112,17 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) =
-            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, None, sender)
-                .await
-                .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(
+            &state,
+            Some("Alice".to_string()),
+            None,
+            None,
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
@@ -1202,10 +1207,17 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) =
-            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, None, sender)
-                .await
-                .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(
+            &state,
+            Some("Alice".to_string()),
+            None,
+            None,
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
