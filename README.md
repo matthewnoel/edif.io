@@ -44,7 +44,7 @@ make test
 ## Current Game Modes
 
  - Keyboarding: *Type the global prompt correctly first to gain points.*
- - Arithmetic: *Proof of concept intended to implement the functionality of: [https://github.com/matthewnoel/arithmetic-practice](https://github.com/matthewnoel/arithmetic-practice)*
+ - Arithmetic: *Answer math questions first to gain points.*
 
  ## Deployment
 
