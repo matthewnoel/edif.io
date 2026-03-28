@@ -29,10 +29,7 @@ fn generate_term(seed: u64, term_salt: u64, min_digits: u32, max_digits: u32) ->
 }
 
 fn parse_str_option<'a>(options: &'a serde_json::Value, key: &str, default: &'a str) -> &'a str {
-    options
-        .get(key)
-        .and_then(|v| v.as_str())
-        .unwrap_or(default)
+    options.get(key).and_then(|v| v.as_str()).unwrap_or(default)
 }
 
 fn parse_u32_option(options: &serde_json::Value, key: &str, default: u32) -> u32 {
@@ -130,16 +127,8 @@ impl GameAdapter for ArithmeticAdapter {
                 },
                 visible_when: None,
             },
-            make_range_field(
-                "firstTermMinimumDigits",
-                "Minimum Digits in First Term",
-                1,
-            ),
-            make_range_field(
-                "firstTermMaximumDigits",
-                "Maximum Digits in First Term",
-                1,
-            ),
+            make_range_field("firstTermMinimumDigits", "Minimum Digits in First Term", 1),
+            make_range_field("firstTermMaximumDigits", "Maximum Digits in First Term", 1),
             make_range_field(
                 "secondTermMinimumDigits",
                 "Minimum Digits in Second Term",
@@ -169,10 +158,8 @@ impl GameAdapter for ArithmeticAdapter {
 
         match op {
             "subtraction" => {
-                let mut t1 =
-                    generate_term(seed, 0, digits.first_min, digits.first_max);
-                let mut t2 =
-                    generate_term(seed, 1, digits.second_min, digits.second_max);
+                let mut t1 = generate_term(seed, 0, digits.first_min, digits.first_max);
+                let mut t2 = generate_term(seed, 1, digits.second_min, digits.second_max);
                 if !allow_negative && t1 < t2 {
                     std::mem::swap(&mut t1, &mut t2);
                 }
@@ -222,9 +209,7 @@ fn generate_division_prompt(seed: u64, digits: &TermDigits) -> String {
     };
     let second_hi = 10_i64.pow(digits.second_max) - 1;
 
-    let potential_divisors: Vec<i64> = (second_lo..=second_hi)
-        .filter(|&d| t1 % d == 0)
-        .collect();
+    let potential_divisors: Vec<i64> = (second_lo..=second_hi).filter(|&d| t1 % d == 0).collect();
 
     if !potential_divisors.is_empty() {
         let idx = splitmix64(seed.wrapping_add(2)) as usize % potential_divisors.len();
@@ -312,7 +297,10 @@ mod tests {
         let adapter = ArithmeticAdapter;
         let opts = serde_json::json!({"operation": "multiplication"});
         let prompt = adapter.next_prompt(42, &opts);
-        assert!(prompt.contains('\u{00d7}'), "expected \u{00d7} in: {prompt}");
+        assert!(
+            prompt.contains('\u{00d7}'),
+            "expected \u{00d7} in: {prompt}"
+        );
     }
 
     #[test]
@@ -399,10 +387,7 @@ mod tests {
             assert_eq!(parts.len(), 2);
             let left: i64 = parts[0].trim().parse().unwrap();
             let right: i64 = parts[1].trim().parse().unwrap();
-            assert!(
-                (10..=99).contains(&left),
-                "left {left} should be 2-digit"
-            );
+            assert!((10..=99).contains(&left), "left {left} should be 2-digit");
             assert!(
                 (10..=99).contains(&right),
                 "right {right} should be 2-digit"
@@ -422,17 +407,16 @@ mod tests {
         });
         for seed in 0..50 {
             let prompt = adapter.next_prompt(seed, &opts);
-            let (l, r) = prompt.split_once('\u{00d7}').expect("multiplication prompt");
+            let (l, r) = prompt
+                .split_once('\u{00d7}')
+                .expect("multiplication prompt");
             let left: i64 = l.trim().parse().unwrap();
             let right: i64 = r.trim().parse().unwrap();
             assert!(
                 (10..=999).contains(&left),
                 "left {left} should be 2-3 digits"
             );
-            assert!(
-                (1..=9).contains(&right),
-                "right {right} should be 1 digit"
-            );
+            assert!((1..=9).contains(&right), "right {right} should be 1 digit");
         }
     }
 
