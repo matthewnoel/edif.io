@@ -21,34 +21,18 @@ Recommended Node Version Managers: [fnm](https://github.com/Schniz/fnm) or [nvm]
 
 ## Run Locally
 
-### 1. Start the unified game server
-
 ```sh
-cargo run -p server
-```
-
-### 2. Start the client
-
-In a second terminal:
-
-```sh
-cd client
-nvm use
-npm install
-npm run dev
+make dev
 ```
 
 ## Test and Validation
 
 ```sh
-cargo test --workspace
+make check
 ```
 
 ```sh
-cd client
-npm run check
-npm run lint
-npm run test:unit -- --run
+make test
 ```
 
 ## Adding a New Game Mode
@@ -64,5 +48,5 @@ npm run test:unit -- --run
 
  ## Deployment
 
-The app is containerized via `Dockerfile` and uses Caddy as a reverse proxy.
-It can be deployed to any Docker-capable host.
+The app is containerized via the `Dockerfile` and uses Caddy as a reverse proxy.
+It can be deployed to any Docker-capable host. A deployment is maintained by Plunge Studios at [edif.io](https://edif.io), but you're free to make, modify, and deploy your own versions if you wish.
