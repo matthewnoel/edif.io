@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
 	import { gs, connect, setOnWelcome, defaultWsUrl } from '$lib/game/connection.svelte';
-	import type { GameModeInfo, OptionField } from '$lib/game/protocol';
+	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import Select from '$lib/components/Select.svelte';
@@ -58,24 +58,6 @@
 				gameOptionValues = { ...gameOptionValues, [minKey]: value };
 			}
 		}
-	}
-
-	function rangeMax(opt: OptionField & { type: 'range' }, key: string): number {
-		for (const [minKey, maxKey] of RANGE_PAIRS) {
-			if (key === minKey) {
-				return parseInt(gameOptionValues[maxKey] ?? String(opt.max));
-			}
-		}
-		return opt.max;
-	}
-
-	function rangeMin(opt: OptionField & { type: 'range' }, key: string): number {
-		for (const [minKey, maxKey] of RANGE_PAIRS) {
-			if (key === maxKey) {
-				return parseInt(gameOptionValues[minKey] ?? String(opt.min));
-			}
-		}
-		return opt.min;
 	}
 
 	onMount(async () => {
@@ -186,8 +168,8 @@
 					<label>
 						<strong>{opt.label} ({gameOptionValues[opt.key] ?? opt.default}):</strong>
 						<RangeInput
-							min={rangeMin(opt, opt.key)}
-							max={rangeMax(opt, opt.key)}
+							min={opt.min}
+							max={opt.max}
 							step={opt.step}
 							value={gameOptionValues[opt.key] ?? String(opt.default)}
 							oninput={(e) => handleRangeChange(opt.key, e.currentTarget.value)}
