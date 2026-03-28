@@ -332,7 +332,11 @@ impl GameAdapter for KeyboardingAdapter {
         "keyboarding"
     }
 
-    fn next_prompt(&self, seed: u64) -> String {
+    fn game_label(&self) -> &'static str {
+        "Keyboarding"
+    }
+
+    fn next_prompt(&self, seed: u64, _options: &serde_json::Value) -> String {
         let idx = (seed as usize) % WORDS.len();
         WORDS[idx].to_string()
     }

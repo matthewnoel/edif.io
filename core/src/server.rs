@@ -1,4 +1,4 @@
-use crate::adapter::{AdapterHandle, AdapterRegistry, build_adapter_registry};
+use crate::adapter::{AdapterHandle, AdapterRegistry, OptionField, build_adapter_registry};
 use crate::game::{
     DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
     apply_wrong_answer_penalty, deduct_from_top_players, find_top_player_ids,
@@ -10,6 +10,7 @@ use crate::powerup::{
     pick_powerup_kind, pick_powerup_recipient,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
+use axum::Json;
 use axum::Router;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -52,6 +53,7 @@ struct RoomConnection {
 
 struct SharedState {
     adapters: AdapterRegistry,
+    adapter_order: Vec<String>,
     default_game_key: String,
     config: ServerConfig,
     rooms: Mutex<HashMap<String, RoomState>>,
@@ -65,9 +67,11 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
         .first()
         .map(|adapter| adapter.game_key().to_string())
         .ok_or_else(|| "at least one adapter must be registered".to_string())?;
+    let adapter_order: Vec<String> = adapters.iter().map(|a| a.game_key().to_string()).collect();
     let adapters = build_adapter_registry(adapters)?;
     let state = Arc::new(SharedState {
         adapters,
+        adapter_order,
         default_game_key,
         config: config.clone(),
         rooms: Mutex::new(HashMap::new()),
@@ -84,6 +88,7 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
     let app = Router::new()
         .route("/healthz", get(health_handler))
         .route("/readyz", get(health_handler))
+        .route("/api/game-modes", get(game_modes_handler))
         .route("/ws", get(ws_handler))
         .with_state(state);
 
@@ -98,6 +103,31 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
 
 async fn health_handler() -> impl IntoResponse {
     "ok"
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GameModeInfo {
+    key: String,
+    label: String,
+    options: Vec<OptionField>,
+}
+
+async fn game_modes_handler(
+    State(state): State<Arc<SharedState>>,
+) -> Json<Vec<GameModeInfo>> {
+    let modes = state
+        .adapter_order
+        .iter()
+        .filter_map(|key| {
+            state.adapters.get(key).map(|a| GameModeInfo {
+                key: a.game_key().to_string(),
+                label: a.game_label().to_string(),
+                options: a.option_schema(),
+            })
+        })
+        .collect();
+    Json(modes)
 }
 
 async fn ws_handler(
@@ -147,6 +177,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                 room_code: requested_room_code,
                 game_mode,
                 match_duration_secs,
+                game_options,
             } => {
                 if player_id.is_some() {
                     continue;
@@ -158,6 +189,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     requested_room_code,
                     game_mode,
                     match_duration_secs,
+                    game_options,
                     client_tx.clone(),
                 )
                 .await;
@@ -350,6 +382,7 @@ async fn join_or_create_room(
     requested_room_code: Option<String>,
     requested_game_mode: Option<String>,
     requested_match_duration_secs: Option<u64>,
+    requested_game_options: Option<serde_json::Value>,
     sender: mpsc::UnboundedSender<Message>,
 ) -> Result<(String, String, PlayerId), JoinError> {
     let token = generate_rejoin_token();
@@ -383,6 +416,7 @@ async fn join_or_create_room(
                 RoomState {
                     room_code: generated.clone(),
                     game_key: room_game_key,
+                    game_options: requested_game_options.unwrap_or(serde_json::Value::Null),
                     players: HashMap::new(),
                     prompt: String::new(),
                     round_id: 0,
@@ -656,7 +690,7 @@ async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bo
         let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
         let seed = splitmix64(raw_seed);
         room.round_id += 1;
-        room.prompt = adapter.next_prompt(seed);
+        room.prompt = adapter.next_prompt(seed, &room.game_options);
         for player in room.players.values_mut() {
             player.progress.clear();
         }
@@ -912,7 +946,7 @@ mod tests {
             self.key
         }
 
-        fn next_prompt(&self, seed: u64) -> String {
+        fn next_prompt(&self, seed: u64, _options: &serde_json::Value) -> String {
             format!("{}-{seed}", self.prompt_prefix)
         }
 
@@ -946,6 +980,7 @@ mod tests {
 
         Arc::new(SharedState {
             adapters,
+            adapter_order: vec!["keyboarding".to_string(), "arithmetic".to_string()],
             default_game_key: "keyboarding".to_string(),
             config: ServerConfig::default(),
             rooms: Mutex::new(HashMap::new()),
@@ -965,6 +1000,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
+            None,
             None,
             sender,
         )
@@ -987,6 +1023,7 @@ mod tests {
             None,
             Some("unknown-mode".to_string()),
             None,
+            None,
             sender,
         )
         .await;
@@ -1007,6 +1044,7 @@ mod tests {
             None,
             Some("keyboarding".to_string()),
             None,
+            None,
             sender_1,
         )
         .await
@@ -1017,6 +1055,7 @@ mod tests {
             Some("Bob".to_string()),
             Some(room_code.clone()),
             Some("arithmetic".to_string()),
+            None,
             None,
             sender_2,
         )
@@ -1039,6 +1078,7 @@ mod tests {
             Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
+            None,
             None,
             sender,
         )
@@ -1075,7 +1115,7 @@ mod tests {
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (room_code, _token, pid) =
-            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, sender)
+            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, None, sender)
                 .await
                 .expect("room created");
 
@@ -1120,6 +1160,7 @@ mod tests {
             None,
             Some("arithmetic".to_string()),
             None,
+            None,
             sender,
         )
         .await
@@ -1162,7 +1203,7 @@ mod tests {
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (room_code, _token, pid) =
-            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, sender)
+            join_or_create_room(&state, Some("Alice".to_string()), None, None, None, None, sender)
                 .await
                 .expect("room created");
 

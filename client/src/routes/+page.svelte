@@ -2,13 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		gs,
-		connect,
-		setOnWelcome,
-		defaultWsUrl,
-		type GameMode
-	} from '$lib/game/connection.svelte';
+	import { gs, connect, setOnWelcome, defaultWsUrl } from '$lib/game/connection.svelte';
+	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import Select from '$lib/components/Select.svelte';
@@ -17,26 +12,63 @@
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let playerName = $state('');
 	let roomCodeInput = $state('');
-	let selectedGameMode = $state<GameMode>('keyboarding');
+	let selectedGameMode = $state('');
 	let matchDuration = $state('60');
+	let gameModes = $state<GameModeInfo[]>([]);
+	let gameOptionValues = $state<Record<string, string>>({});
 	let code = $derived(roomCodeInput);
 
-	onMount(() => {
+	let selectedMode = $derived(gameModes.find((m) => m.key === selectedGameMode));
+
+	function initOptionDefaults(mode: GameModeInfo | undefined): void {
+		if (!mode || mode.options.length === 0) {
+			gameOptionValues = {};
+			return;
+		}
+		const defaults: Record<string, string> = {};
+		for (const opt of mode.options) {
+			defaults[opt.key] = gameOptionValues[opt.key] ?? opt.default;
+		}
+		gameOptionValues = defaults;
+	}
+
+	onMount(async () => {
 		wsUrl = defaultWsUrl();
 		setOnWelcome((roomCode) => {
 			goto(resolve(`/room/${roomCode}`));
 		});
+
+		try {
+			const res = await fetch('/api/game-modes');
+			if (res.ok) {
+				const modes: GameModeInfo[] = await res.json();
+				gameModes = modes;
+				if (modes.length > 0 && !selectedGameMode) {
+					selectedGameMode = modes[0].key;
+					initOptionDefaults(modes[0]);
+				}
+			}
+		} catch {
+			/* server may not be running yet during dev */
+		}
 	});
 
 	onDestroy(() => {
 		setOnWelcome(null);
 	});
 
+	function handleGameModeChange(newMode: string): void {
+		selectedGameMode = newMode;
+		initOptionDefaults(gameModes.find((m) => m.key === newMode));
+	}
+
 	function createRoom(): void {
+		const hasOptions = Object.keys(gameOptionValues).length > 0;
 		connect(wsUrl, {
 			playerName,
 			gameMode: selectedGameMode,
-			matchDurationSecs: parseInt(matchDuration) || 60
+			matchDurationSecs: parseInt(matchDuration) || 60,
+			gameOptions: hasOptions ? gameOptionValues : undefined
 		});
 	}
 
@@ -81,16 +113,30 @@
 				/>
 			</label>
 		{/if}
-		<label>
-			<strong>Game Mode:</strong>
-			<Select
-				bind:value={selectedGameMode}
-				options={[
-					{ value: 'keyboarding', label: 'Keyboarding' },
-					{ value: 'arithmetic', label: 'Arithmetic' }
-				]}
-			/>
-		</label>
+		{#if gameModes.length > 0}
+			<label>
+				<strong>Game Mode:</strong>
+				<Select
+					value={selectedGameMode}
+					onchange={(e) => handleGameModeChange(e.currentTarget.value)}
+					options={gameModes.map((m) => ({ value: m.key, label: m.label }))}
+				/>
+			</label>
+		{/if}
+		{#if selectedMode?.options.length}
+			{#each selectedMode.options as opt (opt.key)}
+				<label>
+					<strong>{opt.label}:</strong>
+					<Select
+						value={gameOptionValues[opt.key] ?? opt.default}
+						onchange={(e) => {
+							gameOptionValues = { ...gameOptionValues, [opt.key]: e.currentTarget.value };
+						}}
+						options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
+					/>
+				</label>
+			{/each}
+		{/if}
 		<label>
 			<strong>Match Duration in Seconds:</strong>
 			<TextInput

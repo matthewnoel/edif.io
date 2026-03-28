@@ -142,6 +142,7 @@ name = "edif-io-arithmetic-adapter"
 version = "0.1.0"
 dependencies = [
  "core",
+ "serde_json",
 ]
 
 [[package]]
@@ -149,6 +150,7 @@ name = "edif-io-keyboarding-adapter"
 version = "0.1.0"
 dependencies = [
  "core",
+ "serde_json",
 ]
 
 [[package]]

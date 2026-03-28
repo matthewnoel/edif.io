@@ -40,6 +40,25 @@ export type RoomSnapshot = {
 	activePowerups: ActivePowerUpSnapshot[];
 };
 
+export type SelectChoice = {
+	value: string;
+	label: string;
+};
+
+export type OptionField = {
+	key: string;
+	label: string;
+	type: 'select';
+	choices: SelectChoice[];
+	default: string;
+};
+
+export type GameModeInfo = {
+	key: string;
+	label: string;
+	options: OptionField[];
+};
+
 export type ClientMessage =
 	| {
 			type: 'joinOrCreateRoom';
@@ -47,6 +66,7 @@ export type ClientMessage =
 			roomCode?: string;
 			gameMode?: string;
 			matchDurationSecs?: number;
+			gameOptions?: Record<string, string>;
 	  }
 	| { type: 'rejoinRoom'; rejoinToken: string }
 	| { type: 'inputUpdate'; text: string }
