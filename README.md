@@ -6,7 +6,7 @@ Pluggable multiplayer prompt-race game. **[Play Now](https://edif.io)**
 
 - **Everyone keeps playing**
   - Whether you're leading or trailing, the game keeps you answering and practicing — nobody sits idle.
-- **Catch-up, not cutthroat**
+- **Catch-up, not punishing**
   - Power-ups give trailing players a boost without stopping leaders from practicing, keeping rounds fun and competitive for all skill levels.
 - **Safe by default**
   - No custom player names or user-generated text — designed so a teacher or parent never has to worry about what's on screen.
