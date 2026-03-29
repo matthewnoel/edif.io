@@ -269,7 +269,6 @@
 			const rejoinToken = loadRejoinToken(code);
 			connect(session?.wsUrl ?? defaultWsUrl(), {
 				roomCode: code,
-				playerName: session?.playerName,
 				gameMode: session?.gameMode,
 				rejoinToken: rejoinToken ?? undefined
 			});

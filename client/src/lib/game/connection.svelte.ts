@@ -13,7 +13,6 @@ const SESSION_KEY = 'edifio-connection';
 const REJOIN_PREFIX = 'edifio-rejoin-';
 
 type SessionData = {
-	playerName: string;
 	gameMode: string;
 	wsUrl: string;
 };
@@ -210,7 +209,6 @@ export function connect(
 	wsUrl: string,
 	opts?: {
 		roomCode?: string;
-		playerName?: string;
 		gameMode?: string;
 		matchDurationSecs?: number;
 		gameOptions?: Record<string, string>;
@@ -228,7 +226,6 @@ export function connect(
 	socket?.close();
 
 	saveSession({
-		playerName: opts?.playerName ?? '',
 		gameMode: opts?.gameMode ?? '',
 		wsUrl
 	});
@@ -249,7 +246,6 @@ export function connect(
 			const hasOptions = opts?.gameOptions && Object.keys(opts.gameOptions).length > 0;
 			sendClientMessage({
 				type: 'joinOrCreateRoom',
-				playerName: opts?.playerName?.trim() || undefined,
 				roomCode: opts?.roomCode ? normalizeRoomCode(opts.roomCode) : undefined,
 				gameMode: opts?.gameMode || undefined,
 				matchDurationSecs: opts?.matchDurationSecs,

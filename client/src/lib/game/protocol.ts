@@ -86,7 +86,6 @@ export type GameModeInfo = {
 export type ClientMessage =
 	| {
 			type: 'joinOrCreateRoom';
-			playerName?: string;
 			roomCode?: string;
 			gameMode?: string;
 			matchDurationSecs?: number;

@@ -1,6 +1,6 @@
 NODE_VERSION := $(shell sed 's/^v//' client/.nvmrc)
 
-.PHONY: dev test check build
+.PHONY: dev test check build format
 
 dev:
 	trap 'kill 0' EXIT; \
@@ -15,6 +15,10 @@ test:
 check:
 	cargo check --workspace
 	cd client && npm run check && npm run lint
+
+format:
+	cargo fmt --all
+	cd client && npm run format
 
 build:
 	docker build --build-arg NODE_VERSION=$(NODE_VERSION) .
