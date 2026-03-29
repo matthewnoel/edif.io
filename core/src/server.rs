@@ -572,8 +572,7 @@ async fn handle_submission(
 
                 if let Some(idx) = oldest_idx {
                     let offer = room.powerup_offers.swap_remove(idx);
-                    let player_count =
-                        room.players.values().filter(|p| p.connected).count();
+                    let player_count = room.players.values().filter(|p| p.connected).count();
                     let duration = effect_duration(offer.kind, player_count);
                     room.active_powerups.push(ActivePowerUp {
                         kind: offer.kind,
