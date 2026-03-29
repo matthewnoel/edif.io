@@ -928,10 +928,10 @@ fn generate_player_name(rng: &mut impl Rng) -> String {
     const ADJECTIVES: &[&str] = &[
         "Brave", "Clever", "Cosmic", "Daring", "Dizzy", "Eager", "Fancy", "Fizzy", "Fluffy",
         "Funky", "Gentle", "Giddy", "Glossy", "Golden", "Happy", "Hasty", "Jazzy", "Jolly",
-        "Lucky", "Mega", "Mighty", "Misty", "Nifty", "Noble", "Peppy", "Plucky", "Polar",
-        "Quick", "Rapid", "Rocky", "Royal", "Rusty", "Sandy", "Shiny", "Silly", "Sleek",
-        "Snappy", "Solar", "Speedy", "Spicy", "Super", "Swift", "Tiny", "Turbo", "Vivid",
-        "Wacky", "Wild", "Witty", "Zappy", "Zippy",
+        "Lucky", "Mega", "Mighty", "Misty", "Nifty", "Noble", "Peppy", "Plucky", "Polar", "Quick",
+        "Rapid", "Rocky", "Royal", "Rusty", "Sandy", "Shiny", "Silly", "Sleek", "Snappy", "Solar",
+        "Speedy", "Spicy", "Super", "Swift", "Tiny", "Turbo", "Vivid", "Wacky", "Wild", "Witty",
+        "Zappy", "Zippy",
     ];
     const NOUNS: &[&str] = &[
         "Badger", "Banana", "Beetle", "Bison", "Bobcat", "Bunny", "Cactus", "Cloud", "Comet",
@@ -1134,16 +1134,9 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(
-            &state,
-            None,
-            None,
-            None,
-            None,
-            sender,
-        )
-        .await
-        .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
+            .await
+            .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
@@ -1227,16 +1220,9 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(
-            &state,
-            None,
-            None,
-            None,
-            None,
-            sender,
-        )
-        .await
-        .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
+            .await
+            .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
