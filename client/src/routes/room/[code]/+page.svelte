@@ -229,8 +229,7 @@
 		const offsets: Record<number, number> = {};
 		for (const pu of gs.pendingPowerUps) {
 			const remaining = Math.max(0, pu.expiresAt - now);
-			const total = 30_000;
-			const fraction = remaining / total;
+			const fraction = remaining / pu.durationMs;
 			offsets[pu.offerId] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;

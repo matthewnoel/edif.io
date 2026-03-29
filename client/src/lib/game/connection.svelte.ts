@@ -59,6 +59,7 @@ export type PendingPowerUp = {
 	playerId: number;
 	kind: PowerUpKind;
 	expiresAt: number;
+	durationMs: number;
 };
 
 export const gs = $state({
@@ -179,7 +180,8 @@ function handleServerMessage(message: ServerMessage): void {
 					offerId: message.offerId,
 					playerId: message.playerId,
 					kind: message.kind,
-					expiresAt: performance.now() + message.expiresInMs
+					expiresAt: performance.now() + message.expiresInMs,
+					durationMs: message.expiresInMs
 				}
 			];
 			break;

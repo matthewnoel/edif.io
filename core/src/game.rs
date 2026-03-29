@@ -214,6 +214,7 @@ pub fn resolve_match_by_timer(room: &mut RoomState) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     fn player(id: PlayerId, size: f32) -> PlayerState {
         PlayerState {
@@ -311,6 +312,7 @@ mod tests {
             kind: PowerUpKind::FreezeAllCompetitors,
             source_player_id: 1,
             expires_at: Instant::now(),
+            duration: Duration::from_secs(15),
         });
 
         room.reset_for_rematch();

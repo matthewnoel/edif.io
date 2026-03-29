@@ -5,7 +5,7 @@ use crate::game::{
     resolve_match_by_timer,
 };
 use crate::powerup::{
-    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpKind, PowerUpOffer, cleanup_expired,
+    ActivePowerUp, PowerUpKind, PowerUpOffer, cleanup_expired, distribution_interval,
     effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
     pick_powerup_kind, pick_powerup_recipient,
 };
@@ -572,11 +572,14 @@ async fn handle_submission(
 
                 if let Some(idx) = oldest_idx {
                     let offer = room.powerup_offers.swap_remove(idx);
-                    let duration = effect_duration(offer.kind);
+                    let player_count =
+                        room.players.values().filter(|p| p.connected).count();
+                    let duration = effect_duration(offer.kind, player_count);
                     room.active_powerups.push(ActivePowerUp {
                         kind: offer.kind,
                         source_player_id: player_id,
                         expires_at: now + duration,
+                        duration,
                     });
                     earned_powerups.push(ServerMessage::PowerUpActivated {
                         offer_id: offer.offer_id,
@@ -732,8 +735,9 @@ fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: 
 fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duration_secs: u64) {
     tokio::spawn(async move {
         let match_end = Instant::now() + Duration::from_secs(match_duration_secs);
+        let mut next_interval = distribution_interval(2);
         loop {
-            tokio::time::sleep(Duration::from_secs(DISTRIBUTION_INTERVAL_SECS)).await;
+            tokio::time::sleep(next_interval).await;
 
             let now = Instant::now();
             if now >= match_end {
@@ -777,10 +781,14 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                     .map(|p| (p.id, p.size))
                     .collect();
 
+                let player_count = players.len();
+                next_interval = distribution_interval(player_count);
+
                 let mut rng = rand::rng();
                 if let Some(recipient) = pick_powerup_recipient(&players, &mut rng) {
                     let kind = pick_powerup_kind(&mut rng);
-                    let expires_at = now + offer_duration();
+                    let offer_dur = offer_duration(player_count);
+                    let expires_at = now + offer_dur;
                     let offer_id = room.next_offer_id;
                     room.next_offer_id += 1;
                     room.powerup_offers.push(PowerUpOffer {
@@ -789,12 +797,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                         player_id: recipient,
                         expires_at,
                     });
-                    let expires_in_ms = offer_duration().as_millis() as u64;
                     new_offer_notif = Some(ServerMessage::PowerUpOffered {
                         offer_id,
                         player_id: recipient,
                         kind,
-                        expires_in_ms,
+                        expires_in_ms: offer_dur.as_millis() as u64,
                     });
                 }
             }
@@ -1147,6 +1154,7 @@ mod tests {
                 kind: PowerUpKind::FreezeAllCompetitors,
                 source_player_id: 999,
                 expires_at: Instant::now() + Duration::from_secs(15),
+                duration: Duration::from_secs(15),
             });
         }
 
@@ -1193,6 +1201,7 @@ mod tests {
                 kind: PowerUpKind::DoublePoints,
                 source_player_id: pid,
                 expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
             });
         }
 

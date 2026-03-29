@@ -21,8 +21,9 @@ const ALL_KINDS: [PowerUpKind; 5] = [
     PowerUpKind::OngoingScoreSteal,
 ];
 
-pub const OFFER_DURATION_SECS: u64 = 30;
-pub const DISTRIBUTION_INTERVAL_SECS: u64 = 10;
+const BASE_PLAYER_COUNT: f64 = 5.0;
+const BASE_OFFER_DURATION_SECS: f64 = 30.0;
+const BASE_DISTRIBUTION_INTERVAL_SECS: f64 = 10.0;
 
 #[derive(Debug, Clone)]
 pub struct PowerUpOffer {
@@ -37,6 +38,7 @@ pub struct ActivePowerUp {
     pub kind: PowerUpKind,
     pub source_player_id: PlayerId,
     pub expires_at: Instant,
+    pub duration: Duration,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,23 +60,36 @@ impl ActivePowerUp {
             kind: self.kind,
             source_player_id: self.source_player_id,
             remaining_ms: remaining,
-            duration_ms: effect_duration(self.kind).as_millis() as u64,
+            duration_ms: self.duration.as_millis() as u64,
         }
     }
 }
 
-pub fn effect_duration(kind: PowerUpKind) -> Duration {
-    match kind {
-        PowerUpKind::FreezeAllCompetitors => Duration::from_secs(15),
-        PowerUpKind::DoublePoints => Duration::from_secs(30),
-        PowerUpKind::ScrambleFont => Duration::from_secs(20),
-        PowerUpKind::ScoreSteal => Duration::from_secs(5),
-        PowerUpKind::OngoingScoreSteal => Duration::from_secs(30),
-    }
+fn player_scale(player_count: usize) -> f64 {
+    (player_count as f64 / BASE_PLAYER_COUNT).clamp(0.4, 1.0)
 }
 
-pub fn offer_duration() -> Duration {
-    Duration::from_secs(OFFER_DURATION_SECS)
+pub fn effect_duration(kind: PowerUpKind, player_count: usize) -> Duration {
+    let base_secs: f64 = match kind {
+        PowerUpKind::FreezeAllCompetitors => 15.0,
+        PowerUpKind::DoublePoints => 30.0,
+        PowerUpKind::ScrambleFont => 20.0,
+        PowerUpKind::ScoreSteal => 5.0,
+        PowerUpKind::OngoingScoreSteal => 30.0,
+    };
+    let scaled = base_secs * player_scale(player_count);
+    Duration::from_secs_f64(scaled)
+}
+
+pub fn offer_duration(player_count: usize) -> Duration {
+    let scaled = BASE_OFFER_DURATION_SECS * player_scale(player_count);
+    Duration::from_secs_f64(scaled)
+}
+
+pub fn distribution_interval(player_count: usize) -> Duration {
+    let scale = player_scale(player_count);
+    let scaled = BASE_DISTRIBUTION_INTERVAL_SECS / scale;
+    Duration::from_secs_f64(scaled.clamp(BASE_DISTRIBUTION_INTERVAL_SECS, 25.0))
 }
 
 /// Select a power-up recipient weighted toward players furthest behind.
@@ -243,6 +258,7 @@ mod tests {
             kind: PowerUpKind::FreezeAllCompetitors,
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
+            duration: Duration::from_secs(10),
         }];
         assert!(is_player_frozen(&actives, 2));
         assert!(!is_player_frozen(&actives, 1));
@@ -255,6 +271,7 @@ mod tests {
             kind: PowerUpKind::FreezeAllCompetitors,
             source_player_id: 1,
             expires_at: now - Duration::from_secs(1),
+            duration: Duration::from_secs(10),
         }];
         assert!(!is_player_frozen(&actives, 2));
     }
@@ -266,6 +283,7 @@ mod tests {
             kind: PowerUpKind::DoublePoints,
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
+            duration: Duration::from_secs(10),
         }];
         assert!(has_double_points(&actives, 1));
         assert!(!has_double_points(&actives, 2));
@@ -278,6 +296,7 @@ mod tests {
             kind: PowerUpKind::OngoingScoreSteal,
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
+            duration: Duration::from_secs(10),
         }];
         assert!(has_ongoing_score_steal(&actives, 1));
         assert!(!has_ongoing_score_steal(&actives, 2));
@@ -305,11 +324,13 @@ mod tests {
                 kind: PowerUpKind::FreezeAllCompetitors,
                 source_player_id: 3,
                 expires_at: now - Duration::from_secs(1),
+                duration: Duration::from_secs(10),
             },
             ActivePowerUp {
                 kind: PowerUpKind::DoublePoints,
                 source_player_id: 4,
                 expires_at: now + Duration::from_secs(10),
+                duration: Duration::from_secs(10),
             },
         ];
 
@@ -320,5 +341,23 @@ mod tests {
         assert_eq!(actives[0].source_player_id, 4);
         assert_eq!(expired.expired_offers.len(), 1);
         assert_eq!(expired.expired_effects.len(), 1);
+    }
+
+    #[test]
+    fn scaling_at_baseline_returns_base_values() {
+        let dur = effect_duration(PowerUpKind::FreezeAllCompetitors, 5);
+        assert_eq!(dur, Duration::from_secs(15));
+        assert_eq!(offer_duration(5), Duration::from_secs(30));
+        assert_eq!(distribution_interval(5), Duration::from_secs(10));
+    }
+
+    #[test]
+    fn scaling_at_two_players_reduces_durations() {
+        let freeze = effect_duration(PowerUpKind::FreezeAllCompetitors, 2);
+        assert_eq!(freeze, Duration::from_secs(6));
+        let offer = offer_duration(2);
+        assert_eq!(offer, Duration::from_secs(12));
+        let interval = distribution_interval(2);
+        assert_eq!(interval, Duration::from_secs(25));
     }
 }
