@@ -105,6 +105,7 @@ export type ServerMessage =
 			roomCode: string;
 			gameKey: string;
 			inputPlaceholder: string;
+			inputMode: 'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal';
 			rejoinToken: string;
 	  }
 	| { type: 'roomState'; room: RoomSnapshot }
@@ -213,6 +214,7 @@ function isServerMessage(value: unknown): value is ServerMessage {
 				typeof value.roomCode === 'string' &&
 				typeof value.gameKey === 'string' &&
 				typeof value.inputPlaceholder === 'string' &&
+				typeof value.inputMode === 'string' &&
 				typeof value.rejoinToken === 'string'
 			);
 		case 'roomState':

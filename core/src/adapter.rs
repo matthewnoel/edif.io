@@ -60,6 +60,9 @@ pub trait GameAdapter: Send + Sync + 'static {
     fn input_placeholder(&self) -> &'static str {
         "Type your answer; press return."
     }
+    fn input_mode(&self) -> &'static str {
+        "text"
+    }
 }
 
 pub type AdapterHandle = Arc<dyn GameAdapter>;

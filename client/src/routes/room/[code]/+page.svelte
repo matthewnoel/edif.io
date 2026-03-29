@@ -379,11 +379,15 @@
 									if (e.key === 'Enter' && !inputDisabled) submitPrompt();
 								}}
 								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
+								inputmode={gs.inputMode}
+								enterkeyhint="go"
 								autocomplete="off"
 								autocorrect="off"
 								autocapitalize="off"
 								spellcheck="false"
 								disabled={inputDisabled}
+								inlineButtonLabel="Go"
+								inlineButtonOnclick={() => submitPrompt()}
 							/>
 						</div>
 						{#if myActiveEffects.length > 0}

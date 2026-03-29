@@ -14,6 +14,7 @@ describe('decodeServerMessage', () => {
 				roomCode: 'ABCD',
 				gameKey: 'keyboarding',
 				inputPlaceholder: 'Type here...',
+				inputMode: 'text',
 				rejoinToken: 'abc123'
 			})
 		);

@@ -69,6 +69,7 @@ export const gs = $state({
 	roomCode: '',
 	gameKey: '',
 	inputPlaceholder: '',
+	inputMode: 'text' as 'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal',
 	promptInput: '',
 	latestRoundSummary: '',
 	latestRoundSummaryColor: '',
@@ -105,6 +106,7 @@ function handleServerMessage(message: ServerMessage): void {
 			gs.playerId = message.playerId;
 			gs.gameKey = message.gameKey;
 			gs.inputPlaceholder = message.inputPlaceholder;
+			gs.inputMode = message.inputMode;
 			gs.roomCode = message.roomCode;
 			gs.phase = 'ingame';
 			saveRejoinToken(message.roomCode, message.rejoinToken);

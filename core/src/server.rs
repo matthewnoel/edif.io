@@ -212,8 +212,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                                     .await
                                     .unwrap_or_else(|| state.default_game_key.clone()),
                                 input_placeholder: adapter
+                                    .as_ref()
                                     .map(|a| a.input_placeholder().to_string())
                                     .unwrap_or_default(),
+                                input_mode: adapter
+                                    .as_ref()
+                                    .map(|a| a.input_mode().to_string())
+                                    .unwrap_or_else(|| "text".to_string()),
                                 rejoin_token: token,
                             },
                         );
@@ -319,8 +324,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                             .await
                             .unwrap_or_else(|| state.default_game_key.clone()),
                         input_placeholder: adapter
+                            .as_ref()
                             .map(|a| a.input_placeholder().to_string())
                             .unwrap_or_default(),
+                        input_mode: adapter
+                            .as_ref()
+                            .map(|a| a.input_mode().to_string())
+                            .unwrap_or_else(|| "text".to_string()),
                         rejoin_token,
                     },
                 );

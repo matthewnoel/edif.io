@@ -54,6 +54,8 @@ pub enum ServerMessage {
         game_key: String,
         #[serde(rename = "inputPlaceholder")]
         input_placeholder: String,
+        #[serde(rename = "inputMode")]
+        input_mode: String,
         #[serde(rename = "rejoinToken")]
         rejoin_token: String,
     },
