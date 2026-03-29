@@ -23,3 +23,8 @@
 - WebSocket payloads: JSON, `type` field in camelCase.
 - Never add server-authoritative blob positions to client.
 - Additive adapter interfaces; new modes must not break existing ones.
+
+## AGENTS.md Maintenance
+- Some AGENTS.md files contain `<!-- GENERATED:... -->` marker sections that are auto-filled by `scripts/generate-agents-md.sh`.
+- Edit content **outside** those markers freely; content **inside** markers will be overwritten on the next generation run.
+- After adding or renaming an adapter, run `bash scripts/generate-agents-md.sh` to update generated sections.

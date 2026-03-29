@@ -6,10 +6,13 @@
 ## Key Files
 
 - `src/routes/+page.svelte`: lobby.
-- `src/routes/room/[code]/+page.svelte`: in-game UI.
-- `src/lib/game/connection.svelte.ts`: reactive WebSocket state.
+- `src/routes/room/[code]/+page.svelte`: in-game UI (includes power-up rings/toasts/effects).
+- `src/lib/game/connection.svelte.ts`: reactive WebSocket state (includes power-up offer handling).
 - `src/lib/game/protocol.ts`: message types (keep aligned with `core/src/protocol.rs`).
 - `src/lib/game/sim.ts`: clumping/orbit simulation.
+- `src/lib/components/PowerUpBadge.svelte`: power-up badge component.
+
+For power-up details see `.cursor/skills/powerups/SKILL.md`.
 
 ## Rules
 

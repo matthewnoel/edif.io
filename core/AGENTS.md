@@ -8,6 +8,7 @@
 - `protocol.rs`: websocket message types.
 - `game.rs`: room/player state, win rules.
 - `server.rs`: axum websocket runtime, room lifecycle.
+- `powerup.rs`: power-up system (see `.cursor/skills/powerups/SKILL.md`).
 
 ## Rules
 - Server authoritative for prompt outcomes and size updates.
