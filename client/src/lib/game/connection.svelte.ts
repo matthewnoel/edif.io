@@ -168,6 +168,10 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		case 'error':
 			gs.errorMessage = message.message;
+			if (gs.phase === 'connecting') {
+				gs.phase = 'pregame';
+				socket?.close();
+			}
 			break;
 		case 'powerUpOffered':
 			gs.pendingPowerUps = [
