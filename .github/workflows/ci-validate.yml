@@ -46,6 +46,7 @@ jobs:
               - 'core/**'
               - 'adapters/**'
               - 'server/**'
+              - 'scripts/**'
             web:
               - 'client/**'
             workflow:
@@ -120,3 +121,20 @@ jobs:
       - name: Web unit tests
         run: npm run test:unit -- --run
         working-directory: client
+
+  validate-agents-md:
+    name: Validate (agents-md)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: >-
+      needs.changes.outputs.rust == 'true'
+      || needs.changes.outputs.workflow == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Validate AGENTS.md files are up to date
+        run: bash scripts/generate-agents-md.sh --check

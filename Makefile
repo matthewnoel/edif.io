@@ -1,6 +1,6 @@
 NODE_VERSION := $(shell sed 's/^v//' client/.nvmrc)
 
-.PHONY: dev test check build format
+.PHONY: dev test check build format generate
 
 dev:
 	trap 'kill 0' EXIT; \
@@ -22,3 +22,6 @@ format:
 
 build:
 	docker build --build-arg NODE_VERSION=$(NODE_VERSION) .
+
+generate:
+	bash scripts/generate-agents-md.sh

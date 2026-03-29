@@ -11,6 +11,7 @@ on:
       - "adapters/**"
       - "server/**"
       - "client/**"
+      - "scripts/**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -98,6 +99,9 @@ jobs:
         if: needs.changes.outputs.web == 'true'
         run: npm run format
         working-directory: client
+
+      - name: Regenerate AGENTS.md files
+        run: bash scripts/generate-agents-md.sh
 
       - name: Commit automated fixes
         uses: stefanzweifel/git-auto-commit-action@v5

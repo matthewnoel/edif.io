@@ -19,6 +19,12 @@
 - Package tests (if present): `cargo test -p server`
 - Full workspace tests: `cargo test --workspace`
 
+## Registered Adapters
+<!-- GENERATED:REGISTERED_ADAPTERS -->
+- `arithmetic` (`edif-io-arithmetic-adapter`): Implements arithmetic prompt racing for edif.io.
+- `keyboarding` (`edif-io-keyboarding-adapter`): Implements word-based prompt racing for edif.io.
+<!-- /GENERATED:REGISTERED_ADAPTERS -->
+
 ## Implementation Rules
 - Keep this crate thin: orchestration and composition only, not gameplay logic.
 - Register adapters explicitly and preserve stable `game_key()` behavior across deployments.
