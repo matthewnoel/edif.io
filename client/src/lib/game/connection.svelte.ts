@@ -13,7 +13,6 @@ const SESSION_KEY = 'edifio-connection';
 const REJOIN_PREFIX = 'edifio-rejoin-';
 
 type SessionData = {
-	playerName: string;
 	gameMode: string;
 	wsUrl: string;
 };
@@ -60,6 +59,7 @@ export type PendingPowerUp = {
 	playerId: number;
 	kind: PowerUpKind;
 	expiresAt: number;
+	durationMs: number;
 };
 
 export const gs = $state({
@@ -69,6 +69,7 @@ export const gs = $state({
 	roomCode: '',
 	gameKey: '',
 	inputPlaceholder: '',
+	inputMode: 'text' as 'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal',
 	promptInput: '',
 	latestRoundSummary: '',
 	latestRoundSummaryColor: '',
@@ -105,6 +106,7 @@ function handleServerMessage(message: ServerMessage): void {
 			gs.playerId = message.playerId;
 			gs.gameKey = message.gameKey;
 			gs.inputPlaceholder = message.inputPlaceholder;
+			gs.inputMode = message.inputMode;
 			gs.roomCode = message.roomCode;
 			gs.phase = 'ingame';
 			saveRejoinToken(message.roomCode, message.rejoinToken);
@@ -166,6 +168,10 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		case 'error':
 			gs.errorMessage = message.message;
+			if (gs.phase === 'connecting') {
+				gs.phase = 'pregame';
+				socket?.close();
+			}
 			break;
 		case 'powerUpOffered':
 			gs.pendingPowerUps = [
@@ -174,7 +180,8 @@ function handleServerMessage(message: ServerMessage): void {
 					offerId: message.offerId,
 					playerId: message.playerId,
 					kind: message.kind,
-					expiresAt: performance.now() + message.expiresInMs
+					expiresAt: performance.now() + message.expiresInMs,
+					durationMs: message.expiresInMs
 				}
 			];
 			break;
@@ -204,7 +211,6 @@ export function connect(
 	wsUrl: string,
 	opts?: {
 		roomCode?: string;
-		playerName?: string;
 		gameMode?: string;
 		matchDurationSecs?: number;
 		gameOptions?: Record<string, string>;
@@ -222,7 +228,6 @@ export function connect(
 	socket?.close();
 
 	saveSession({
-		playerName: opts?.playerName ?? '',
 		gameMode: opts?.gameMode ?? '',
 		wsUrl
 	});
@@ -243,7 +248,6 @@ export function connect(
 			const hasOptions = opts?.gameOptions && Object.keys(opts.gameOptions).length > 0;
 			sendClientMessage({
 				type: 'joinOrCreateRoom',
-				playerName: opts?.playerName?.trim() || undefined,
 				roomCode: opts?.roomCode ? normalizeRoomCode(opts.roomCode) : undefined,
 				gameMode: opts?.gameMode || undefined,
 				matchDurationSecs: opts?.matchDurationSecs,

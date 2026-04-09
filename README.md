@@ -1,52 +1,38 @@
 # edif.io
 
-edif.io is a multiplayer prompt-race game with:
+Pluggable multiplayer prompt-race game. **[Play Now](https://edif.io)**
 
-- a single SvelteKit client (`client`)
-- shared Rust core runtime (`core`)
-- pluggable game adapters (`adapters/*`)
-- one game server binary (`server`)
+## Ethos
 
-Players choose a game mode on the pregame screen when creating a room. Room game mode is authoritative for all players in that room.
+- **Everyone keeps playing**
+  - Whether you're leading or trailing, the game keeps you answering and practicing — nobody sits idle.
+- **Catch-up, not punishing**
+  - Power-ups give trailing players a boost without stopping leaders from practicing, keeping rounds fun and competitive for all skill levels.
+- **Safe by default**
+  - No custom player names or user-generated text — designed so a teacher or parent never has to worry about what's on screen.
 
-## Prerequisites
+## Developing
 
-### Rust
+### Prerequisites
 
-[Installation instructions](https://rust-lang.org/tools/install/)
+ - [Rust](https://rust-lang.org/tools/install/)
+ - [node.js](https://github.com/nvm-sh/nvm)
 
-### Node.js version `./client/.nvmrc`
-
-Recommended Node Version Managers: [fnm](https://github.com/Schniz/fnm) or [nvm](https://github.com/nvm-sh/nvm)
-
-## Run Locally
+### Running Locally
 
 ```sh
 make dev
 ```
 
-## Test and Validation
+### Validation, Testing & Formatting
 
 ```sh
 make check
-```
-
-```sh
 make test
+make format
 ```
 
-## Adding a New Game Mode
-
-1. Add a new adapter crate under `adapters/` implementing `core::GameAdapter`.
-2. Register the adapter in `server/src/main.rs`.
-3. Add the mode to the client pregame selector in `client/src/routes/+page.svelte`.
-
-## Current Game Modes
-
- - Keyboarding: *Type the global prompt correctly first to gain points.*
- - Arithmetic: *Answer math questions first to gain points.*
-
- ## Deployment
+### Deployment
 
 The app is containerized via the `Dockerfile` and uses Caddy as a reverse proxy.
 The Node version is sourced from `client/.nvmrc` and passed as a Docker build arg.
@@ -55,4 +41,4 @@ The Node version is sourced from `client/.nvmrc` and passed as a Docker build ar
 make build
 ```
 
-The image can be deployed to any Docker-capable host. A deployment is maintained by Plunge Studios at [edif.io](https://edif.io), but you're free to make, modify, and deploy your own versions if you wish.
+The image can be deployed to any Docker-capable host. A deployment is maintained by [Plunge Studios](https://github.com/plunge-studios) at [edif.io](https://edif.io), but you're free to make, modify, and deploy your own versions if you wish.

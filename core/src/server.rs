@@ -5,7 +5,7 @@ use crate::game::{
     resolve_match_by_timer,
 };
 use crate::powerup::{
-    ActivePowerUp, DISTRIBUTION_INTERVAL_SECS, PowerUpKind, PowerUpOffer, cleanup_expired,
+    ActivePowerUp, PowerUpKind, PowerUpOffer, cleanup_expired, distribution_interval,
     effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
     pick_powerup_kind, pick_powerup_recipient,
 };
@@ -171,7 +171,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
 
         match incoming {
             ClientMessage::JoinOrCreateRoom {
-                player_name,
                 room_code: requested_room_code,
                 game_mode,
                 match_duration_secs,
@@ -183,7 +182,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
 
                 let result = join_or_create_room(
                     &state,
-                    player_name,
                     requested_room_code,
                     game_mode,
                     match_duration_secs,
@@ -212,8 +210,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                                     .await
                                     .unwrap_or_else(|| state.default_game_key.clone()),
                                 input_placeholder: adapter
+                                    .as_ref()
                                     .map(|a| a.input_placeholder().to_string())
                                     .unwrap_or_default(),
+                                input_mode: adapter
+                                    .as_ref()
+                                    .map(|a| a.input_mode().to_string())
+                                    .unwrap_or_else(|| "text".to_string()),
                                 rejoin_token: token,
                             },
                         );
@@ -319,8 +322,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                             .await
                             .unwrap_or_else(|| state.default_game_key.clone()),
                         input_placeholder: adapter
+                            .as_ref()
                             .map(|a| a.input_placeholder().to_string())
                             .unwrap_or_default(),
+                        input_mode: adapter
+                            .as_ref()
+                            .map(|a| a.input_mode().to_string())
+                            .unwrap_or_else(|| "text".to_string()),
                         rejoin_token,
                     },
                 );
@@ -376,7 +384,6 @@ enum JoinError {
 
 async fn join_or_create_room(
     state: &Arc<SharedState>,
-    player_name: Option<String>,
     requested_room_code: Option<String>,
     requested_game_mode: Option<String>,
     requested_match_duration_secs: Option<u64>,
@@ -443,9 +450,7 @@ async fn join_or_create_room(
         player_id,
         PlayerState {
             id: player_id,
-            name: player_name
-                .filter(|name| !name.trim().is_empty())
-                .unwrap_or_else(|| format!("Player-{player_id}")),
+            name: generate_player_name(&mut rand::rng()),
             size: DEFAULT_START_SIZE,
             color: generate_color(player_id),
             connected: true,
@@ -567,11 +572,13 @@ async fn handle_submission(
 
                 if let Some(idx) = oldest_idx {
                     let offer = room.powerup_offers.swap_remove(idx);
-                    let duration = effect_duration(offer.kind);
+                    let player_count = room.players.values().filter(|p| p.connected).count();
+                    let duration = effect_duration(offer.kind, player_count);
                     room.active_powerups.push(ActivePowerUp {
                         kind: offer.kind,
                         source_player_id: player_id,
                         expires_at: now + duration,
+                        duration,
                     });
                     earned_powerups.push(ServerMessage::PowerUpActivated {
                         offer_id: offer.offer_id,
@@ -727,8 +734,9 @@ fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: 
 fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duration_secs: u64) {
     tokio::spawn(async move {
         let match_end = Instant::now() + Duration::from_secs(match_duration_secs);
+        let mut next_interval = distribution_interval(2);
         loop {
-            tokio::time::sleep(Duration::from_secs(DISTRIBUTION_INTERVAL_SECS)).await;
+            tokio::time::sleep(next_interval).await;
 
             let now = Instant::now();
             if now >= match_end {
@@ -772,10 +780,14 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                     .map(|p| (p.id, p.size))
                     .collect();
 
+                let player_count = players.len();
+                next_interval = distribution_interval(player_count);
+
                 let mut rng = rand::rng();
                 if let Some(recipient) = pick_powerup_recipient(&players, &mut rng) {
                     let kind = pick_powerup_kind(&mut rng);
-                    let expires_at = now + offer_duration();
+                    let offer_dur = offer_duration(player_count);
+                    let expires_at = now + offer_dur;
                     let offer_id = room.next_offer_id;
                     room.next_offer_id += 1;
                     room.powerup_offers.push(PowerUpOffer {
@@ -784,12 +796,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                         player_id: recipient,
                         expires_at,
                     });
-                    let expires_in_ms = offer_duration().as_millis() as u64;
                     new_offer_notif = Some(ServerMessage::PowerUpOffered {
                         offer_id,
                         player_id: recipient,
                         kind,
-                        expires_in_ms,
+                        expires_in_ms: offer_dur.as_millis() as u64,
                     });
                 }
             }
@@ -919,6 +930,28 @@ fn generate_room_code(rooms: &HashMap<String, RoomState>) -> String {
     }
 }
 
+fn generate_player_name(rng: &mut impl Rng) -> String {
+    const ADJECTIVES: &[&str] = &[
+        "Brave", "Clever", "Cosmic", "Daring", "Dizzy", "Eager", "Fancy", "Fizzy", "Fluffy",
+        "Funky", "Gentle", "Giddy", "Glossy", "Golden", "Happy", "Hasty", "Jazzy", "Jolly",
+        "Lucky", "Mega", "Mighty", "Misty", "Nifty", "Noble", "Peppy", "Plucky", "Polar", "Quick",
+        "Rapid", "Rocky", "Royal", "Rusty", "Sandy", "Shiny", "Silly", "Sleek", "Snappy", "Solar",
+        "Speedy", "Spicy", "Super", "Swift", "Tiny", "Turbo", "Vivid", "Wacky", "Wild", "Witty",
+        "Zappy", "Zippy",
+    ];
+    const NOUNS: &[&str] = &[
+        "Badger", "Banana", "Beetle", "Bison", "Bobcat", "Bunny", "Cactus", "Cloud", "Comet",
+        "Cookie", "Corgi", "Dingo", "Dragon", "Eagle", "Falcon", "Ferret", "Fox", "Gecko",
+        "Gopher", "Hippo", "Igloo", "Jackal", "Koala", "Lemon", "Llama", "Mango", "Moose",
+        "Narwhal", "Newt", "Otter", "Owl", "Panda", "Parrot", "Peach", "Penguin", "Pickle",
+        "Puffin", "Quokka", "Raven", "Rocket", "Sloth", "Squid", "Taco", "Tiger", "Toucan",
+        "Turtle", "Waffle", "Walrus", "Yeti", "Zebra",
+    ];
+    let adj = ADJECTIVES[rng.random_range(0..ADJECTIVES.len())];
+    let noun = NOUNS[rng.random_range(0..NOUNS.len())];
+    format!("{adj} {noun}")
+}
+
 fn generate_color(player_id: PlayerId) -> String {
     let palette = [
         "#38bdf8", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#fb7185", "#22d3ee",
@@ -995,7 +1028,6 @@ mod tests {
 
         let (room_code, _token, _pid) = join_or_create_room(
             &state,
-            Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
             None,
@@ -1017,7 +1049,6 @@ mod tests {
 
         let result = join_or_create_room(
             &state,
-            Some("Alice".to_string()),
             None,
             Some("unknown-mode".to_string()),
             None,
@@ -1038,7 +1069,6 @@ mod tests {
 
         let (room_code, _token, _pid) = join_or_create_room(
             &state,
-            Some("Alice".to_string()),
             None,
             Some("keyboarding".to_string()),
             None,
@@ -1050,7 +1080,6 @@ mod tests {
 
         let (joined_room_code, _token, _pid) = join_or_create_room(
             &state,
-            Some("Bob".to_string()),
             Some(room_code.clone()),
             Some("arithmetic".to_string()),
             None,
@@ -1073,7 +1102,6 @@ mod tests {
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (room_code, _token, pid) = join_or_create_room(
             &state,
-            Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
             None,
@@ -1112,17 +1140,9 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(
-            &state,
-            Some("Alice".to_string()),
-            None,
-            None,
-            None,
-            None,
-            sender,
-        )
-        .await
-        .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
+            .await
+            .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
@@ -1133,6 +1153,7 @@ mod tests {
                 kind: PowerUpKind::FreezeAllCompetitors,
                 source_player_id: 999,
                 expires_at: Instant::now() + Duration::from_secs(15),
+                duration: Duration::from_secs(15),
             });
         }
 
@@ -1161,7 +1182,6 @@ mod tests {
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (room_code, _token, pid) = join_or_create_room(
             &state,
-            Some("Alice".to_string()),
             None,
             Some("arithmetic".to_string()),
             None,
@@ -1180,6 +1200,7 @@ mod tests {
                 kind: PowerUpKind::DoublePoints,
                 source_player_id: pid,
                 expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
             });
         }
 
@@ -1207,17 +1228,9 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(
-            &state,
-            Some("Alice".to_string()),
-            None,
-            None,
-            None,
-            None,
-            sender,
-        )
-        .await
-        .expect("room created");
+        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
+            .await
+            .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 

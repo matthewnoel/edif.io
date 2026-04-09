@@ -12,7 +12,6 @@
 	import RangeInput from '$lib/components/RangeInput.svelte';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
-	let playerName = $state('');
 	let roomCodeInput = $state('');
 	let selectedGameMode = $state('');
 	let matchDuration = $state('60');
@@ -93,7 +92,6 @@
 	function createRoom(): void {
 		const hasOptions = Object.keys(gameOptionValues).length > 0;
 		connect(wsUrl, {
-			playerName,
 			gameMode: selectedGameMode,
 			matchDurationSecs: parseInt(matchDuration) || 60,
 			gameOptions: hasOptions ? gameOptionValues : undefined
@@ -111,7 +109,6 @@
 		}
 		connect(wsUrl, {
 			roomCode: code,
-			playerName,
 			gameMode: selectedGameMode
 		});
 	}
@@ -199,17 +196,6 @@
 				min="5"
 				placeholder="60"
 				autocomplete="off"
-			/>
-		</label>
-		<label>
-			<strong>Your Name (optional):</strong>
-			<TextInput
-				bind:value={playerName}
-				placeholder="Player name"
-				autocomplete="off"
-				autocorrect="off"
-				autocapitalize="off"
-				spellcheck="false"
 			/>
 		</label>
 		<label>

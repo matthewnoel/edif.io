@@ -198,6 +198,10 @@ impl GameAdapter for ArithmeticAdapter {
     fn input_placeholder(&self) -> &'static str {
         "Enter the solution; press return."
     }
+
+    fn input_mode(&self) -> &'static str {
+        "decimal"
+    }
 }
 
 fn generate_division_prompt(seed: u64, digits: &TermDigits) -> String {

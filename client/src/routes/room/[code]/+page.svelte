@@ -229,8 +229,7 @@
 		const offsets: Record<number, number> = {};
 		for (const pu of gs.pendingPowerUps) {
 			const remaining = Math.max(0, pu.expiresAt - now);
-			const total = 30_000;
-			const fraction = remaining / total;
+			const fraction = remaining / pu.durationMs;
 			offsets[pu.offerId] = RING_CIRCUMFERENCE * (1 - fraction);
 		}
 		powerupRingOffsets = offsets;
@@ -269,7 +268,6 @@
 			const rejoinToken = loadRejoinToken(code);
 			connect(session?.wsUrl ?? defaultWsUrl(), {
 				roomCode: code,
-				playerName: session?.playerName,
 				gameMode: session?.gameMode,
 				rejoinToken: rejoinToken ?? undefined
 			});
@@ -379,11 +377,15 @@
 									if (e.key === 'Enter' && !inputDisabled) submitPrompt();
 								}}
 								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
+								inputmode={gs.inputMode}
+								enterkeyhint="go"
 								autocomplete="off"
 								autocorrect="off"
 								autocapitalize="off"
 								spellcheck="false"
 								disabled={inputDisabled}
+								inlineButtonLabel="Go"
+								inlineButtonOnclick={() => submitPrompt()}
 							/>
 						</div>
 						{#if myActiveEffects.length > 0}
