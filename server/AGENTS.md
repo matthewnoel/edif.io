@@ -12,6 +12,7 @@
 <!-- GENERATED:REGISTERED_ADAPTERS -->
 - `arithmetic` (`edif-io-arithmetic-adapter`): Implements arithmetic prompt racing for edif.io.
 - `keyboarding` (`edif-io-keyboarding-adapter`): Implements word-based prompt racing for edif.io.
+- `state-abbreviations` (`edif-io-state-abbreviations-adapter`): state-abbreviations adapter.
 <!-- /GENERATED:REGISTERED_ADAPTERS -->
 
 ## Rules

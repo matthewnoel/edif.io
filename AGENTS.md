@@ -11,6 +11,7 @@
 <!-- GENERATED:REPO_ADAPTER_LIST -->
   - `adapters/arithmetic`: Implements arithmetic prompt racing for edif.io.
   - `adapters/keyboarding`: Implements word-based prompt racing for edif.io.
+  - `adapters/state-abbreviations`: state-abbreviations adapter.
 <!-- /GENERATED:REPO_ADAPTER_LIST -->
 - `server`: single Rust binary hosting all adapters.
 
