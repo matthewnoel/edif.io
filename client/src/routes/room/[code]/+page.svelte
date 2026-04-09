@@ -85,7 +85,12 @@
 	let powerUpToastTimeout = 0;
 
 	function doesPowerUpAffectPlayer(
-		pu: { kind: PowerUpKind; sourcePlayerId: number; targetPlayerIds: number[]; remainingMs: number },
+		pu: {
+			kind: PowerUpKind;
+			sourcePlayerId: number;
+			targetPlayerIds: number[];
+			remainingMs: number;
+		},
 		playerId: number | null
 	): boolean {
 		if (pu.remainingMs <= 0 || playerId == null) return false;
@@ -93,9 +98,7 @@
 			return pu.targetPlayerIds.includes(playerId);
 		}
 		const meta = POWERUP_META[pu.kind];
-		return meta.affectsSelf
-			? pu.sourcePlayerId === playerId
-			: pu.sourcePlayerId !== playerId;
+		return meta.affectsSelf ? pu.sourcePlayerId === playerId : pu.sourcePlayerId !== playerId;
 	}
 
 	let myActiveEffects = $derived([

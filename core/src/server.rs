@@ -1024,11 +1024,10 @@ async fn send_to_player(
     message: &ServerMessage,
 ) -> bool {
     let connections = state.connections.lock().await;
-    if let Some(room_conns) = connections.get(room_code) {
-        if let Some(conn) = room_conns.get(&player_id) {
+    if let Some(room_conns) = connections.get(room_code)
+        && let Some(conn) = room_conns.get(&player_id) {
             return send_server_message(&conn.sender, message).is_ok();
         }
-    }
     false
 }
 
@@ -1596,7 +1595,10 @@ mod tests {
         let room = rooms.get(&room_code).expect("room");
         let esc = room.freeze_escape.get(&p1).expect("escape state");
         assert_eq!(esc.correct_streak, 1);
-        assert_ne!(esc.prompt, "kbd-99", "prompt should change after correct answer");
+        assert_ne!(
+            esc.prompt, "kbd-99",
+            "prompt should change after correct answer"
+        );
 
         let player = room.players.get(&p1).unwrap();
         assert_eq!(
@@ -1745,18 +1747,19 @@ mod tests {
         };
         let original_size = {
             let rooms = state.rooms.lock().await;
-            rooms.get(&room_code).unwrap().players.get(&p2).unwrap().size
+            rooms
+                .get(&room_code)
+                .unwrap()
+                .players
+                .get(&p2)
+                .unwrap()
+                .size
         };
 
         handle_submission(&state, &room_code, p2, prompt).await;
 
         let rooms = state.rooms.lock().await;
-        let player = rooms
-            .get(&room_code)
-            .unwrap()
-            .players
-            .get(&p2)
-            .unwrap();
+        let player = rooms.get(&room_code).unwrap().players.get(&p2).unwrap();
         assert!(
             player.size > original_size,
             "non-target player should be able to submit normally"
