@@ -127,6 +127,15 @@ pub enum ServerMessage {
         player_id: PlayerId,
         kind: PowerUpKind,
     },
+    FreezeEscapeState {
+        #[serde(rename = "roomCode")]
+        room_code: String,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
+        prompt: String,
+        streak: u8,
+        required: u8,
+    },
 }
 
 #[cfg(test)]

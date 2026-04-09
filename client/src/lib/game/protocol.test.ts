@@ -66,9 +66,16 @@ describe('decodeServerMessage', () => {
 							kind: 'freezeAllCompetitors',
 							sourcePlayerId: 2,
 							remainingMs: 10000,
-							durationMs: 15000
+							durationMs: 15000,
+							targetPlayerIds: [1]
 						},
-						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000, durationMs: 30000 }
+						{
+							kind: 'doublePoints',
+							sourcePlayerId: 3,
+							remainingMs: 25000,
+							durationMs: 30000,
+							targetPlayerIds: []
+						}
 					]
 				}
 			})
@@ -206,6 +213,20 @@ describe('decodeServerMessage', () => {
 			);
 			expect(parsed?.type).toBe('powerUpOffered');
 		}
+	});
+
+	it('parses freezeEscapeState', () => {
+		const parsed = decodeServerMessage(
+			JSON.stringify({
+				type: 'freezeEscapeState',
+				roomCode: 'ABCD',
+				playerId: 1,
+				prompt: 'hello',
+				streak: 3,
+				required: 5
+			})
+		);
+		expect(parsed?.type).toBe('freezeEscapeState');
 	});
 
 	it('rejects powerUpOffered with invalid kind', () => {

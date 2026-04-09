@@ -1,13 +1,13 @@
 use crate::adapter::{AdapterHandle, AdapterRegistry, OptionField, build_adapter_registry};
 use crate::game::{
-    DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
-    apply_wrong_answer_penalty, deduct_from_top_players, find_top_player_ids,
-    resolve_match_by_timer,
+    DEFAULT_START_SIZE, FREEZE_ESCAPE_REQUIRED, FreezeEscapeState, PlayerId, PlayerState,
+    RoomState, apply_round_win, apply_wrong_answer_penalty, deduct_from_top_players,
+    find_top_player_ids, resolve_match_by_timer,
 };
 use crate::powerup::{
     ActivePowerUp, PowerUpKind, PowerUpOffer, cleanup_expired, distribution_interval,
     effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
-    pick_powerup_kind, pick_powerup_recipient,
+    pick_powerup_kind, pick_powerup_recipient, remove_player_from_freezes,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
 use axum::Json;
@@ -433,6 +433,7 @@ async fn join_or_create_room(
                     powerup_offers: Vec::new(),
                     active_powerups: Vec::new(),
                     next_offer_id: 0,
+                    freeze_escape: HashMap::new(),
                 },
             );
             generated
@@ -478,15 +479,21 @@ async fn handle_progress_update(
     };
     let normalized = adapter.normalize_progress(&text);
 
+    let frozen;
     {
         let mut rooms = state.rooms.lock().await;
         let Some(room) = rooms.get_mut(room_code) else {
             return;
         };
+        frozen = is_player_frozen(&room.active_powerups, player_id);
         let Some(player) = room.players.get_mut(&player_id) else {
             return;
         };
         player.progress = normalized.clone();
+    }
+
+    if frozen {
+        return;
     }
 
     let _ = broadcast_to_room(
@@ -510,10 +517,28 @@ async fn handle_submission(
     let Some(adapter) = adapter_for_room(state, room_code).await else {
         return;
     };
+
+    let frozen = {
+        let rooms = state.rooms.lock().await;
+        let Some(room) = rooms.get(room_code) else {
+            return;
+        };
+        if room.match_winner.is_some() || room.prompt.is_empty() {
+            return;
+        }
+        is_player_frozen(&room.active_powerups, player_id)
+    };
+
+    if frozen {
+        handle_freeze_escape(state, room_code, player_id, text, &adapter).await;
+        return;
+    }
+
     let mut should_advance_round = false;
     let mut round_result: Option<ServerMessage> = None;
     let mut wrong_answer_msg: Option<ServerMessage> = None;
     let mut earned_powerups: Vec<ServerMessage> = Vec::new();
+    let mut freeze_escape_msgs: Vec<(PlayerId, ServerMessage)> = Vec::new();
 
     {
         let mut rooms = state.rooms.lock().await;
@@ -522,10 +547,6 @@ async fn handle_submission(
         };
 
         if room.match_winner.is_some() || room.prompt.is_empty() {
-            return;
-        }
-
-        if is_player_frozen(&room.active_powerups, player_id) {
             return;
         }
 
@@ -574,11 +595,17 @@ async fn handle_submission(
                     let offer = room.powerup_offers.swap_remove(idx);
                     let player_count = room.players.values().filter(|p| p.connected).count();
                     let duration = effect_duration(offer.kind, player_count);
+                    let targets = if offer.kind == PowerUpKind::FreezeAllCompetitors {
+                        find_top_player_ids(&room.players, player_id)
+                    } else {
+                        vec![]
+                    };
                     room.active_powerups.push(ActivePowerUp {
                         kind: offer.kind,
                         source_player_id: player_id,
                         expires_at: now + duration,
                         duration,
+                        target_player_ids: targets.clone(),
                     });
                     earned_powerups.push(ServerMessage::PowerUpActivated {
                         offer_id: offer.offer_id,
@@ -586,6 +613,31 @@ async fn handle_submission(
                         kind: offer.kind,
                         duration_ms: duration.as_millis() as u64,
                     });
+
+                    if offer.kind == PowerUpKind::FreezeAllCompetitors {
+                        for &target_id in &targets {
+                            let escape_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+                            let seed = splitmix64(escape_seed);
+                            let escape_prompt = adapter.next_prompt(seed, &room.game_options);
+                            room.freeze_escape.insert(
+                                target_id,
+                                FreezeEscapeState {
+                                    prompt: escape_prompt.clone(),
+                                    correct_streak: 0,
+                                },
+                            );
+                            freeze_escape_msgs.push((
+                                target_id,
+                                ServerMessage::FreezeEscapeState {
+                                    room_code: room_code.to_string(),
+                                    player_id: target_id,
+                                    prompt: escape_prompt,
+                                    streak: 0,
+                                    required: FREEZE_ESCAPE_REQUIRED,
+                                },
+                            ));
+                        }
+                    }
 
                     if offer.kind == PowerUpKind::ScoreSteal {
                         let top_ids = find_top_player_ids(&room.players, player_id);
@@ -622,8 +674,78 @@ async fn handle_submission(
         let _ = broadcast_room_state(state, room_code).await;
     }
 
+    for (target_id, msg) in freeze_escape_msgs {
+        let _ = send_to_player(state, room_code, target_id, &msg).await;
+    }
+
     if should_advance_round {
         let _ = ensure_prompt_for_room(state, room_code).await;
+    }
+}
+
+async fn handle_freeze_escape(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+    text: String,
+    adapter: &AdapterHandle,
+) {
+    let escape_msg;
+    let mut escaped = false;
+
+    {
+        let mut rooms = state.rooms.lock().await;
+        let Some(room) = rooms.get_mut(room_code) else {
+            return;
+        };
+
+        let Some(esc) = room.freeze_escape.get_mut(&player_id) else {
+            return;
+        };
+
+        if adapter.is_correct(&esc.prompt, &text) {
+            esc.correct_streak += 1;
+            if esc.correct_streak >= FREEZE_ESCAPE_REQUIRED {
+                escaped = true;
+                room.freeze_escape.remove(&player_id);
+                remove_player_from_freezes(&mut room.active_powerups, player_id);
+                escape_msg = None;
+            } else {
+                let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+                let seed = splitmix64(raw_seed);
+                let new_prompt = adapter.next_prompt(seed, &room.game_options);
+                let streak = esc.correct_streak;
+                esc.prompt = new_prompt.clone();
+                escape_msg = Some(ServerMessage::FreezeEscapeState {
+                    room_code: room_code.to_string(),
+                    player_id,
+                    prompt: new_prompt,
+                    streak,
+                    required: FREEZE_ESCAPE_REQUIRED,
+                });
+            }
+        } else {
+            esc.correct_streak = 0;
+            let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+            let seed = splitmix64(raw_seed);
+            let new_prompt = adapter.next_prompt(seed, &room.game_options);
+            esc.prompt = new_prompt.clone();
+            escape_msg = Some(ServerMessage::FreezeEscapeState {
+                room_code: room_code.to_string(),
+                player_id,
+                prompt: new_prompt,
+                streak: 0,
+                required: FREEZE_ESCAPE_REQUIRED,
+            });
+        }
+    }
+
+    if escaped {
+        let _ = broadcast_room_state(state, room_code).await;
+    }
+
+    if let Some(msg) = escape_msg {
+        let _ = send_to_player(state, room_code, player_id, &msg).await;
     }
 }
 
@@ -771,6 +893,11 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                         player_id: effect.source_player_id,
                         kind: effect.kind,
                     });
+                    if effect.kind == PowerUpKind::FreezeAllCompetitors {
+                        for &target_id in &effect.target_player_ids {
+                            room.freeze_escape.remove(&target_id);
+                        }
+                    }
                 }
 
                 let players: Vec<(PlayerId, f32)> = room
@@ -888,6 +1015,21 @@ async fn broadcast_to_room(
         .values()
         .for_each(|conn| drop(send_server_message(&conn.sender, message)));
     true
+}
+
+async fn send_to_player(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+    message: &ServerMessage,
+) -> bool {
+    let connections = state.connections.lock().await;
+    if let Some(room_conns) = connections.get(room_code) {
+        if let Some(conn) = room_conns.get(&player_id) {
+            return send_server_message(&conn.sender, message).is_ok();
+        }
+    }
+    false
 }
 
 fn send_server_message<T: Serialize>(
@@ -1154,6 +1296,7 @@ mod tests {
                 source_player_id: 999,
                 expires_at: Instant::now() + Duration::from_secs(15),
                 duration: Duration::from_secs(15),
+                target_player_ids: vec![pid],
             });
         }
 
@@ -1201,6 +1344,7 @@ mod tests {
                 source_player_id: pid,
                 expires_at: Instant::now() + Duration::from_secs(30),
                 duration: Duration::from_secs(30),
+                target_player_ids: vec![],
             });
         }
 
@@ -1262,5 +1406,360 @@ mod tests {
             PowerUpKind::FreezeAllCompetitors
         );
         assert_eq!(room.active_powerups[0].source_player_id, pid);
+    }
+
+    #[tokio::test]
+    async fn freeze_only_targets_leader() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (s3, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+        let (_, _, p3) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s3)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            room.players.get_mut(&p2).unwrap().size = 20.0;
+            room.players.get_mut(&p3).unwrap().size = 10.0;
+            let offer_id = room.next_offer_id;
+            room.next_offer_id += 1;
+            room.powerup_offers.push(PowerUpOffer {
+                offer_id,
+                kind: PowerUpKind::FreezeAllCompetitors,
+                player_id: p3,
+                expires_at: Instant::now() + Duration::from_secs(30),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room").prompt.clone()
+        };
+        handle_submission(&state, &room_code, p3, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        assert_eq!(room.active_powerups.len(), 1);
+        let freeze = &room.active_powerups[0];
+        assert_eq!(freeze.target_player_ids, vec![p1]);
+        assert!(is_player_frozen(&room.active_powerups, p1));
+        assert!(!is_player_frozen(&room.active_powerups, p2));
+        assert!(!is_player_frozen(&room.active_powerups, p3));
+    }
+
+    #[tokio::test]
+    async fn freeze_targets_tied_leaders() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (s3, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+        let (_, _, p3) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s3)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 25.0;
+            room.players.get_mut(&p2).unwrap().size = 25.0;
+            room.players.get_mut(&p3).unwrap().size = 10.0;
+            let offer_id = room.next_offer_id;
+            room.next_offer_id += 1;
+            room.powerup_offers.push(PowerUpOffer {
+                offer_id,
+                kind: PowerUpKind::FreezeAllCompetitors,
+                player_id: p3,
+                expires_at: Instant::now() + Duration::from_secs(30),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room").prompt.clone()
+        };
+        handle_submission(&state, &room_code, p3, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        let freeze = &room.active_powerups[0];
+        let mut targets = freeze.target_player_ids.clone();
+        targets.sort();
+        assert_eq!(targets, vec![p1, p2]);
+    }
+
+    #[tokio::test]
+    async fn freeze_escape_generates_prompts_for_targets() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            let offer_id = room.next_offer_id;
+            room.next_offer_id += 1;
+            room.powerup_offers.push(PowerUpOffer {
+                offer_id,
+                kind: PowerUpKind::FreezeAllCompetitors,
+                player_id: p2,
+                expires_at: Instant::now() + Duration::from_secs(30),
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room").prompt.clone()
+        };
+        handle_submission(&state, &room_code, p2, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        assert!(room.freeze_escape.contains_key(&p1));
+        let esc = &room.freeze_escape[&p1];
+        assert_eq!(esc.correct_streak, 0);
+        assert!(!esc.prompt.is_empty());
+    }
+
+    #[tokio::test]
+    async fn freeze_escape_correct_answers_increment_streak() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                source_player_id: p2,
+                expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
+                target_player_ids: vec![p1],
+            });
+            room.freeze_escape.insert(
+                p1,
+                FreezeEscapeState {
+                    prompt: "kbd-99".to_string(),
+                    correct_streak: 0,
+                },
+            );
+        }
+
+        handle_submission(&state, &room_code, p1, "kbd-99".to_string()).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        let esc = room.freeze_escape.get(&p1).expect("escape state");
+        assert_eq!(esc.correct_streak, 1);
+        assert_ne!(esc.prompt, "kbd-99", "prompt should change after correct answer");
+
+        let player = room.players.get(&p1).unwrap();
+        assert_eq!(
+            player.size, 30.0,
+            "escape answers should not change player size"
+        );
+    }
+
+    #[tokio::test]
+    async fn freeze_escape_wrong_answer_resets_streak() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                source_player_id: p2,
+                expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
+                target_player_ids: vec![p1],
+            });
+            room.freeze_escape.insert(
+                p1,
+                FreezeEscapeState {
+                    prompt: "kbd-99".to_string(),
+                    correct_streak: 3,
+                },
+            );
+        }
+
+        handle_submission(&state, &room_code, p1, "wrong".to_string()).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        let esc = room.freeze_escape.get(&p1).expect("escape state");
+        assert_eq!(esc.correct_streak, 0, "streak should reset on wrong answer");
+    }
+
+    #[tokio::test]
+    async fn freeze_escape_five_correct_unfreezes_player() {
+        use crate::game::FREEZE_ESCAPE_REQUIRED;
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                source_player_id: p2,
+                expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
+                target_player_ids: vec![p1],
+            });
+            room.freeze_escape.insert(
+                p1,
+                FreezeEscapeState {
+                    prompt: "kbd-1".to_string(),
+                    correct_streak: FREEZE_ESCAPE_REQUIRED - 1,
+                },
+            );
+        }
+
+        handle_submission(&state, &room_code, p1, "kbd-1".to_string()).await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room");
+        assert!(
+            !room.freeze_escape.contains_key(&p1),
+            "escape state should be cleared"
+        );
+        assert!(
+            !is_player_frozen(&room.active_powerups, p1),
+            "player should no longer be frozen"
+        );
+        assert!(
+            room.active_powerups[0].target_player_ids.is_empty(),
+            "player removed from target list"
+        );
+    }
+
+    #[tokio::test]
+    async fn freeze_escape_non_target_not_frozen() {
+        use crate::powerup::PowerUpKind;
+
+        let state = test_state();
+        let (s1, _) = mpsc::unbounded_channel::<Message>();
+        let (s2, _) = mpsc::unbounded_channel::<Message>();
+        let (s3, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _, p1) = join_or_create_room(&state, None, None, None, None, s1)
+            .await
+            .expect("room");
+        let (_, _, p2) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s2)
+            .await
+            .expect("room");
+        let (_, _, p3) = join_or_create_room(&state, Some(room_code.clone()), None, None, None, s3)
+            .await
+            .expect("room");
+
+        handle_start_match(&state, &room_code, p1).await;
+
+        {
+            let mut rooms = state.rooms.lock().await;
+            let room = rooms.get_mut(&room_code).expect("room");
+            room.players.get_mut(&p1).unwrap().size = 30.0;
+            room.players.get_mut(&p2).unwrap().size = 20.0;
+            room.players.get_mut(&p3).unwrap().size = 10.0;
+            room.active_powerups.push(ActivePowerUp {
+                kind: PowerUpKind::FreezeAllCompetitors,
+                source_player_id: p3,
+                expires_at: Instant::now() + Duration::from_secs(30),
+                duration: Duration::from_secs(30),
+                target_player_ids: vec![p1],
+            });
+        }
+
+        let prompt = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room").prompt.clone()
+        };
+        let original_size = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).unwrap().players.get(&p2).unwrap().size
+        };
+
+        handle_submission(&state, &room_code, p2, prompt).await;
+
+        let rooms = state.rooms.lock().await;
+        let player = rooms
+            .get(&room_code)
+            .unwrap()
+            .players
+            .get(&p2)
+            .unwrap();
+        assert!(
+            player.size > original_size,
+            "non-target player should be able to submit normally"
+        );
     }
 }

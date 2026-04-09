@@ -5,6 +5,13 @@ use std::time::Instant;
 
 pub const DEFAULT_START_SIZE: f32 = 10.0;
 pub const MIN_PLAYER_SIZE: f32 = 1.0;
+pub const FREEZE_ESCAPE_REQUIRED: u8 = 5;
+
+#[derive(Debug, Clone)]
+pub struct FreezeEscapeState {
+    pub prompt: String,
+    pub correct_streak: u8,
+}
 
 pub type PlayerId = u64;
 
@@ -72,6 +79,7 @@ pub struct RoomState {
     pub powerup_offers: Vec<PowerUpOffer>,
     pub active_powerups: Vec<ActivePowerUp>,
     pub next_offer_id: u64,
+    pub freeze_escape: HashMap<PlayerId, FreezeEscapeState>,
 }
 
 impl RoomState {
@@ -83,6 +91,7 @@ impl RoomState {
         self.powerup_offers.clear();
         self.active_powerups.clear();
         self.next_offer_id = 0;
+        self.freeze_escape.clear();
         for player in self.players.values_mut() {
             player.size = DEFAULT_START_SIZE;
             player.progress.clear();
@@ -244,6 +253,7 @@ mod tests {
             powerup_offers: Vec::new(),
             active_powerups: Vec::new(),
             next_offer_id: 0,
+            freeze_escape: HashMap::new(),
         }
     }
 
@@ -313,6 +323,7 @@ mod tests {
             source_player_id: 1,
             expires_at: Instant::now(),
             duration: Duration::from_secs(15),
+            target_player_ids: vec![2],
         });
 
         room.reset_for_rematch();

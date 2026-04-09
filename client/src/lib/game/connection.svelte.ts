@@ -79,7 +79,8 @@ export const gs = $state({
 	socketState: 'idle',
 	lastSocketDetail: '',
 	pendingPowerUps: [] as PendingPowerUp[],
-	powerUpToast: null as PowerUpKind | null
+	powerUpToast: null as PowerUpKind | null,
+	freezeEscape: null as { prompt: string; streak: number; required: number } | null
 });
 
 let socket: WebSocket | null = null;
@@ -117,9 +118,22 @@ function handleServerMessage(message: ServerMessage): void {
 			if (message.room.matchWinner) {
 				gs.pendingPowerUps = [];
 				gs.powerUpToast = null;
+				gs.freezeEscape = null;
 				const winner = message.room.players.find((p) => p.id === message.room.matchWinner);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.room.matchWinner}`} wins the match`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';
+			}
+			if (gs.freezeEscape && gs.playerId != null) {
+				const stillFrozen = message.room.activePowerups.some(
+					(pu) =>
+						pu.kind === 'freezeAllCompetitors' &&
+						pu.targetPlayerIds.includes(gs.playerId!) &&
+						pu.remainingMs > 0
+				);
+				if (!stillFrozen) {
+					gs.freezeEscape = null;
+					gs.promptInput = '';
+				}
 			}
 			break;
 		case 'promptState':
@@ -203,6 +217,14 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		}
 		case 'powerUpEffectEnded':
+			break;
+		case 'freezeEscapeState':
+			gs.freezeEscape = {
+				prompt: message.prompt,
+				streak: message.streak,
+				required: message.required
+			};
+			gs.promptInput = '';
 			break;
 	}
 }
@@ -316,5 +338,6 @@ export function rematch(): void {
 	gs.latestRoundSummaryColor = '';
 	gs.promptInput = '';
 	gs.pendingPowerUps = [];
+	gs.freezeEscape = null;
 	sendClientMessage({ type: 'rematch' });
 }

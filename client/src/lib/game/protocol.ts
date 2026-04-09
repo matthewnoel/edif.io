@@ -18,6 +18,7 @@ export type ActivePowerUpSnapshot = {
 	sourcePlayerId: number;
 	remainingMs: number;
 	durationMs: number;
+	targetPlayerIds: number[];
 };
 
 export type PlayerSnapshot = {
@@ -134,7 +135,15 @@ export type ServerMessage =
 			durationMs: number;
 	  }
 	| { type: 'powerUpOfferExpired'; offerId: number; playerId: number; kind: PowerUpKind }
-	| { type: 'powerUpEffectEnded'; playerId: number; kind: PowerUpKind };
+	| { type: 'powerUpEffectEnded'; playerId: number; kind: PowerUpKind }
+	| {
+			type: 'freezeEscapeState';
+			roomCode: string;
+			playerId: number;
+			prompt: string;
+			streak: number;
+			required: number;
+	  };
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
@@ -171,7 +180,9 @@ function isActivePowerUpSnapshot(value: unknown): value is ActivePowerUpSnapshot
 		isPowerUpKind(value.kind) &&
 		typeof value.sourcePlayerId === 'number' &&
 		typeof value.remainingMs === 'number' &&
-		typeof value.durationMs === 'number'
+		typeof value.durationMs === 'number' &&
+		Array.isArray(value.targetPlayerIds) &&
+		value.targetPlayerIds.every((id: unknown) => typeof id === 'number')
 	);
 }
 
@@ -269,6 +280,14 @@ function isServerMessage(value: unknown): value is ServerMessage {
 			);
 		case 'powerUpEffectEnded':
 			return typeof value.playerId === 'number' && isPowerUpKind(value.kind);
+		case 'freezeEscapeState':
+			return (
+				typeof value.roomCode === 'string' &&
+				typeof value.playerId === 'number' &&
+				typeof value.prompt === 'string' &&
+				typeof value.streak === 'number' &&
+				typeof value.required === 'number'
+			);
 		default:
 			return false;
 	}

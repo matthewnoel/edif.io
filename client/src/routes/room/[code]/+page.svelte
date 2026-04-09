@@ -37,7 +37,7 @@
 			emoji: '\u{1F976}',
 			label: 'Frozen!',
 			affectsSelf: false,
-			disablesInput: true
+			disablesInput: false
 		},
 		doublePoints: {
 			emoji: '\u{1F4AA}',
@@ -84,16 +84,24 @@
 	let copyTimeout = 0;
 	let powerUpToastTimeout = 0;
 
+	function doesPowerUpAffectPlayer(
+		pu: { kind: PowerUpKind; sourcePlayerId: number; targetPlayerIds: number[]; remainingMs: number },
+		playerId: number | null
+	): boolean {
+		if (pu.remainingMs <= 0 || playerId == null) return false;
+		if (pu.kind === 'freezeAllCompetitors') {
+			return pu.targetPlayerIds.includes(playerId);
+		}
+		const meta = POWERUP_META[pu.kind];
+		return meta.affectsSelf
+			? pu.sourcePlayerId === playerId
+			: pu.sourcePlayerId !== playerId;
+	}
+
 	let myActiveEffects = $derived([
 		...new Map(
 			(gs.room?.activePowerups ?? [])
-				.filter((pu) => {
-					if (pu.remainingMs <= 0) return false;
-					const meta = POWERUP_META[pu.kind];
-					return meta.affectsSelf
-						? pu.sourcePlayerId === gs.playerId
-						: pu.sourcePlayerId !== gs.playerId;
-				})
+				.filter((pu) => doesPowerUpAffectPlayer(pu, gs.playerId))
 				.map(
 					(pu) =>
 						[
@@ -106,10 +114,16 @@
 
 	let inputDisabled = $derived(myActiveEffects.some((e) => e.disablesInput));
 
+	let isFrozen = $derived(gs.freezeEscape != null);
+
+	let displayedPrompt = $derived(gs.freezeEscape?.prompt ?? gs.room?.prompt ?? '');
+
 	let promptScrambled = $derived(
-		(gs.room?.activePowerups ?? []).some(
-			(pu) => pu.kind === 'scrambleFont' && pu.sourcePlayerId !== gs.playerId && pu.remainingMs > 0
-		)
+		!isFrozen &&
+			(gs.room?.activePowerups ?? []).some(
+				(pu) =>
+					pu.kind === 'scrambleFont' && pu.sourcePlayerId !== gs.playerId && pu.remainingMs > 0
+			)
 	);
 
 	let myColor = $derived(gs.room?.players.find((p) => p.id === gs.playerId)?.color ?? null);
@@ -129,13 +143,7 @@
 		return [
 			...new Set(
 				(gs.room?.activePowerups ?? [])
-					.filter((pu) => {
-						if (pu.remainingMs <= 0) return false;
-						const meta = POWERUP_META[pu.kind];
-						return meta.affectsSelf
-							? pu.sourcePlayerId === playerId
-							: pu.sourcePlayerId !== playerId;
-					})
+					.filter((pu) => doesPowerUpAffectPlayer(pu, playerId))
 					.map((pu) => POWERUP_META[pu.kind].emoji)
 			)
 		].join('');
@@ -171,12 +179,7 @@
 		const now = performance.now();
 		const timers: Record<string, { expiresAt: number; durationMs: number }> = {};
 		for (const pu of powerups) {
-			if (pu.remainingMs <= 0) continue;
-			const meta = POWERUP_META[pu.kind];
-			const appliesToMe = meta.affectsSelf
-				? pu.sourcePlayerId === gs.playerId
-				: pu.sourcePlayerId !== gs.playerId;
-			if (!appliesToMe) continue;
+			if (!doesPowerUpAffectPlayer(pu, gs.playerId)) continue;
 			timers[pu.kind] = { expiresAt: now + pu.remainingMs, durationMs: pu.durationMs };
 		}
 		effectTimers = timers;
@@ -305,10 +308,15 @@
 					<strong>{formatTimer(timerDisplayMs)}</strong>
 				</div>
 			{/if}
-			{#if gs.room?.prompt}
+			{#if displayedPrompt}
 				<div class="prompt" class:shizuru-regular={promptScrambled}>
-					<strong>{gs.room?.prompt}</strong>
+					<strong>{displayedPrompt}</strong>
 				</div>
+				{#if gs.freezeEscape}
+					<div class="escape-progress">
+						Type your way out! {gs.freezeEscape.streak}/{gs.freezeEscape.required} correct
+					</div>
+				{/if}
 			{:else if !gs.room?.matchWinner}
 				<div class="prompt">
 					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>
@@ -367,7 +375,7 @@
 							{/each}
 						</div>
 					{/if}
-					{#if gs.room?.prompt}
+					{#if displayedPrompt}
 						<div class="input-container" class:disabled={inputDisabled}>
 							<TextInput
 								bind:el={promptInputEl}
@@ -376,7 +384,9 @@
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && !inputDisabled) submitPrompt();
 								}}
-								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
+								placeholder={isFrozen
+									? 'Answer to break free!'
+									: gs.inputPlaceholder || 'Type your answer; press return.'}
 								inputmode={gs.inputMode}
 								enterkeyhint="go"
 								autocomplete="off"
@@ -393,10 +403,12 @@
 								{#each myActiveEffects as effect (effect.kind)}
 									<PowerUpBadge
 										emoji={effect.emoji}
-										label={effect.label}
+										label={effect.kind === 'freezeAllCompetitors' && gs.freezeEscape
+											? `${gs.freezeEscape.streak}/${gs.freezeEscape.required}`
+											: effect.label}
 										fraction={effectFractions[effect.kind] ?? 1}
-										barColor={effect.disablesInput ? '#1e40af' : '#92400e'}
-										variant={effect.disablesInput ? 'debuff' : 'buff'}
+										barColor={effect.kind === 'freezeAllCompetitors' ? '#1e40af' : '#92400e'}
+										variant={effect.kind === 'freezeAllCompetitors' ? 'debuff' : 'buff'}
 									/>
 								{/each}
 							</div>
@@ -509,6 +521,14 @@
 		font-size: 2rem;
 		text-align: center;
 		margin: 1rem 0 2rem 0;
+	}
+
+	.escape-progress {
+		text-align: center;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: #1e40af;
+		margin: -1rem 0 0.5rem 0;
 	}
 
 	.input-row {

@@ -39,6 +39,7 @@ pub struct ActivePowerUp {
     pub source_player_id: PlayerId,
     pub expires_at: Instant,
     pub duration: Duration,
+    pub target_player_ids: Vec<PlayerId>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -48,6 +49,7 @@ pub struct ActivePowerUpSnapshot {
     pub source_player_id: PlayerId,
     pub remaining_ms: u64,
     pub duration_ms: u64,
+    pub target_player_ids: Vec<PlayerId>,
 }
 
 impl ActivePowerUp {
@@ -61,6 +63,7 @@ impl ActivePowerUp {
             source_player_id: self.source_player_id,
             remaining_ms: remaining,
             duration_ms: self.duration.as_millis() as u64,
+            target_player_ids: self.target_player_ids.clone(),
         }
     }
 }
@@ -134,9 +137,17 @@ pub fn is_player_frozen(active_powerups: &[ActivePowerUp], player_id: PlayerId) 
     let now = Instant::now();
     active_powerups.iter().any(|pu| {
         pu.kind == PowerUpKind::FreezeAllCompetitors
-            && pu.source_player_id != player_id
+            && pu.target_player_ids.contains(&player_id)
             && pu.expires_at > now
     })
+}
+
+pub fn remove_player_from_freezes(active_powerups: &mut [ActivePowerUp], player_id: PlayerId) {
+    for pu in active_powerups.iter_mut() {
+        if pu.kind == PowerUpKind::FreezeAllCompetitors {
+            pu.target_player_ids.retain(|&id| id != player_id);
+        }
+    }
 }
 
 pub fn has_double_points(active_powerups: &[ActivePowerUp], player_id: PlayerId) -> bool {
@@ -252,16 +263,18 @@ mod tests {
     }
 
     #[test]
-    fn frozen_check_respects_source_and_expiry() {
+    fn frozen_check_uses_target_list() {
         let now = Instant::now();
         let actives = vec![ActivePowerUp {
             kind: PowerUpKind::FreezeAllCompetitors,
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
             duration: Duration::from_secs(10),
+            target_player_ids: vec![2],
         }];
         assert!(is_player_frozen(&actives, 2));
         assert!(!is_player_frozen(&actives, 1));
+        assert!(!is_player_frozen(&actives, 3));
     }
 
     #[test]
@@ -272,6 +285,7 @@ mod tests {
             source_player_id: 1,
             expires_at: now - Duration::from_secs(1),
             duration: Duration::from_secs(10),
+            target_player_ids: vec![2],
         }];
         assert!(!is_player_frozen(&actives, 2));
     }
@@ -284,6 +298,7 @@ mod tests {
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
             duration: Duration::from_secs(10),
+            target_player_ids: vec![],
         }];
         assert!(has_double_points(&actives, 1));
         assert!(!has_double_points(&actives, 2));
@@ -297,6 +312,7 @@ mod tests {
             source_player_id: 1,
             expires_at: now + Duration::from_secs(10),
             duration: Duration::from_secs(10),
+            target_player_ids: vec![],
         }];
         assert!(has_ongoing_score_steal(&actives, 1));
         assert!(!has_ongoing_score_steal(&actives, 2));
@@ -325,12 +341,14 @@ mod tests {
                 source_player_id: 3,
                 expires_at: now - Duration::from_secs(1),
                 duration: Duration::from_secs(10),
+                target_player_ids: vec![1, 2],
             },
             ActivePowerUp {
                 kind: PowerUpKind::DoublePoints,
                 source_player_id: 4,
                 expires_at: now + Duration::from_secs(10),
                 duration: Duration::from_secs(10),
+                target_player_ids: vec![],
             },
         ];
 
