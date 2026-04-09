@@ -1,6 +1,7 @@
 use core::{ServerConfig, run_server};
 use edif_io_arithmetic_adapter::ArithmeticAdapter;
 use edif_io_keyboarding_adapter::KeyboardingAdapter;
+use edif_io_state_abbreviations_adapter::StateAbbreviationsAdapter;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -28,7 +29,11 @@ async fn main() -> std::io::Result<()> {
         match_duration_secs,
     };
     run_server(
-        vec![Arc::new(KeyboardingAdapter), Arc::new(ArithmeticAdapter)],
+        vec![
+            Arc::new(KeyboardingAdapter),
+            Arc::new(ArithmeticAdapter),
+            Arc::new(StateAbbreviationsAdapter),
+        ],
         config,
     )
     .await
