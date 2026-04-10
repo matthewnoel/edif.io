@@ -7,4 +7,5 @@ edition = "2024"
 core = { path = "../core" }
 edif-io-keyboarding-adapter = { path = "../adapters/keyboarding" }
 edif-io-arithmetic-adapter = { path = "../adapters/arithmetic" }
+edif-io-state-abbreviations-adapter = { path = "../adapters/state-abbreviations" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

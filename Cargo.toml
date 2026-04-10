@@ -3,6 +3,7 @@ members = [
     "core",
     "adapters/keyboarding",
     "adapters/arithmetic",
+    "adapters/state-abbreviations",
     "server",
 ]
 resolver = "2"
