@@ -6,8 +6,8 @@ use crate::game::{
 };
 use crate::powerup::{
     ActivePowerUp, PowerUpKind, PowerUpOffer, cleanup_expired, distribution_interval,
-    effect_duration, has_double_points, has_ongoing_score_steal, offer_duration,
-    pick_powerup_kind, pick_powerup_recipient,
+    effect_duration, has_double_points, has_ongoing_score_steal, offer_duration, pick_powerup_kind,
+    pick_powerup_recipient,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
 use axum::Json;
@@ -1213,10 +1213,7 @@ mod tests {
         let room = rooms.get(&room_code).expect("room exists");
         assert!(room.powerup_offers.is_empty(), "offer should be consumed");
         assert_eq!(room.active_powerups.len(), 1, "one active power-up");
-        assert_eq!(
-            room.active_powerups[0].kind,
-            PowerUpKind::DoublePoints
-        );
+        assert_eq!(room.active_powerups[0].kind, PowerUpKind::DoublePoints);
         assert_eq!(room.active_powerups[0].source_player_id, pid);
     }
 }

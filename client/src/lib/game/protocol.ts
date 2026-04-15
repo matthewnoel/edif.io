@@ -6,11 +6,7 @@ export type ErrorCode =
 	| 'roomExpired'
 	| 'playerNotInRoom';
 
-export type PowerUpKind =
-	| 'doublePoints'
-	| 'scrambleFont'
-	| 'scoreSteal'
-	| 'ongoingScoreSteal';
+export type PowerUpKind = 'doublePoints' | 'scrambleFont' | 'scoreSteal' | 'ongoingScoreSteal';
 
 export type ActivePowerUpSnapshot = {
 	kind: PowerUpKind;
