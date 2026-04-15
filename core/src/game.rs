@@ -309,7 +309,7 @@ mod tests {
             expires_at: Instant::now(),
         });
         room.active_powerups.push(ActivePowerUp {
-            kind: PowerUpKind::FreezeAllCompetitors,
+            kind: PowerUpKind::DoublePoints,
             source_player_id: 1,
             expires_at: Instant::now(),
             duration: Duration::from_secs(15),
