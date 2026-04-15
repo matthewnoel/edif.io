@@ -6,15 +6,13 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PowerUpKind {
-    FreezeAllCompetitors,
     DoublePoints,
     ScrambleFont,
     ScoreSteal,
     OngoingScoreSteal,
 }
 
-const ALL_KINDS: [PowerUpKind; 5] = [
-    PowerUpKind::FreezeAllCompetitors,
+const ALL_KINDS: [PowerUpKind; 4] = [
     PowerUpKind::DoublePoints,
     PowerUpKind::ScrambleFont,
     PowerUpKind::ScoreSteal,
@@ -71,7 +69,6 @@ fn player_scale(player_count: usize) -> f64 {
 
 pub fn effect_duration(kind: PowerUpKind, player_count: usize) -> Duration {
     let base_secs: f64 = match kind {
-        PowerUpKind::FreezeAllCompetitors => 15.0,
         PowerUpKind::DoublePoints => 30.0,
         PowerUpKind::ScrambleFont => 20.0,
         PowerUpKind::ScoreSteal => 5.0,
@@ -128,15 +125,6 @@ pub fn pick_powerup_recipient(players: &[(PlayerId, f32)], rng: &mut impl Rng) -
 
 pub fn pick_powerup_kind(rng: &mut impl Rng) -> PowerUpKind {
     ALL_KINDS[rng.random_range(0..ALL_KINDS.len())]
-}
-
-pub fn is_player_frozen(active_powerups: &[ActivePowerUp], player_id: PlayerId) -> bool {
-    let now = Instant::now();
-    active_powerups.iter().any(|pu| {
-        pu.kind == PowerUpKind::FreezeAllCompetitors
-            && pu.source_player_id != player_id
-            && pu.expires_at > now
-    })
 }
 
 pub fn has_double_points(active_powerups: &[ActivePowerUp], player_id: PlayerId) -> bool {
@@ -242,38 +230,12 @@ mod tests {
             let kind = pick_powerup_kind(&mut rng);
             assert!(matches!(
                 kind,
-                PowerUpKind::FreezeAllCompetitors
-                    | PowerUpKind::DoublePoints
+                PowerUpKind::DoublePoints
                     | PowerUpKind::ScrambleFont
                     | PowerUpKind::ScoreSteal
                     | PowerUpKind::OngoingScoreSteal
             ));
         }
-    }
-
-    #[test]
-    fn frozen_check_respects_source_and_expiry() {
-        let now = Instant::now();
-        let actives = vec![ActivePowerUp {
-            kind: PowerUpKind::FreezeAllCompetitors,
-            source_player_id: 1,
-            expires_at: now + Duration::from_secs(10),
-            duration: Duration::from_secs(10),
-        }];
-        assert!(is_player_frozen(&actives, 2));
-        assert!(!is_player_frozen(&actives, 1));
-    }
-
-    #[test]
-    fn frozen_check_ignores_expired() {
-        let now = Instant::now();
-        let actives = vec![ActivePowerUp {
-            kind: PowerUpKind::FreezeAllCompetitors,
-            source_player_id: 1,
-            expires_at: now - Duration::from_secs(1),
-            duration: Duration::from_secs(10),
-        }];
-        assert!(!is_player_frozen(&actives, 2));
     }
 
     #[test]
@@ -314,14 +276,14 @@ mod tests {
             },
             PowerUpOffer {
                 offer_id: 1,
-                kind: PowerUpKind::FreezeAllCompetitors,
+                kind: PowerUpKind::ScrambleFont,
                 player_id: 2,
                 expires_at: now + Duration::from_secs(10),
             },
         ];
         let mut actives = vec![
             ActivePowerUp {
-                kind: PowerUpKind::FreezeAllCompetitors,
+                kind: PowerUpKind::ScrambleFont,
                 source_player_id: 3,
                 expires_at: now - Duration::from_secs(1),
                 duration: Duration::from_secs(10),
@@ -345,16 +307,16 @@ mod tests {
 
     #[test]
     fn scaling_at_baseline_returns_base_values() {
-        let dur = effect_duration(PowerUpKind::FreezeAllCompetitors, 5);
-        assert_eq!(dur, Duration::from_secs(15));
+        let dur = effect_duration(PowerUpKind::DoublePoints, 5);
+        assert_eq!(dur, Duration::from_secs(30));
         assert_eq!(offer_duration(5), Duration::from_secs(30));
         assert_eq!(distribution_interval(5), Duration::from_secs(10));
     }
 
     #[test]
     fn scaling_at_two_players_reduces_durations() {
-        let freeze = effect_duration(PowerUpKind::FreezeAllCompetitors, 2);
-        assert_eq!(freeze, Duration::from_secs(6));
+        let double = effect_duration(PowerUpKind::DoublePoints, 2);
+        assert_eq!(double, Duration::from_secs(12));
         let offer = offer_duration(2);
         assert_eq!(offer, Duration::from_secs(12));
         let interval = distribution_interval(2);

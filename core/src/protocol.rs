@@ -179,14 +179,14 @@ mod tests {
         let msg = super::ServerMessage::PowerUpOffered {
             offer_id: 5,
             player_id: 2,
-            kind: super::PowerUpKind::FreezeAllCompetitors,
+            kind: super::PowerUpKind::DoublePoints,
             expires_in_ms: 30000,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpOffered""#));
         assert!(json.contains(r#""offerId":5"#));
         assert!(json.contains(r#""playerId":2"#));
-        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
         assert!(json.contains(r#""expiresInMs":30000"#));
     }
 
@@ -224,12 +224,12 @@ mod tests {
     fn serializes_powerup_effect_ended() {
         let msg = super::ServerMessage::PowerUpEffectEnded {
             player_id: 1,
-            kind: super::PowerUpKind::FreezeAllCompetitors,
+            kind: super::PowerUpKind::DoublePoints,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"powerUpEffectEnded""#));
         assert!(json.contains(r#""playerId":1"#));
-        assert!(json.contains(r#""kind":"freezeAllCompetitors""#));
+        assert!(json.contains(r#""kind":"doublePoints""#));
     }
 
     #[test]

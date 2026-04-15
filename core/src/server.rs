@@ -6,7 +6,7 @@ use crate::game::{
 };
 use crate::powerup::{
     ActivePowerUp, PowerUpKind, PowerUpOffer, cleanup_expired, distribution_interval,
-    effect_duration, has_double_points, has_ongoing_score_steal, is_player_frozen, offer_duration,
+    effect_duration, has_double_points, has_ongoing_score_steal, offer_duration,
     pick_powerup_kind, pick_powerup_recipient,
 };
 use crate::protocol::{ClientMessage, ErrorCode, ServerMessage};
@@ -522,10 +522,6 @@ async fn handle_submission(
         };
 
         if room.match_winner.is_some() || room.prompt.is_empty() {
-            return;
-        }
-
-        if is_player_frozen(&room.active_powerups, player_id) {
             return;
         }
 
@@ -1135,46 +1131,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn frozen_player_cannot_submit() {
-        use crate::powerup::PowerUpKind;
-
-        let state = test_state();
-        let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
-            .await
-            .expect("room created");
-
-        handle_start_match(&state, &room_code, pid).await;
-
-        {
-            let mut rooms = state.rooms.lock().await;
-            let room = rooms.get_mut(&room_code).expect("room exists");
-            room.active_powerups.push(ActivePowerUp {
-                kind: PowerUpKind::FreezeAllCompetitors,
-                source_player_id: 999,
-                expires_at: Instant::now() + Duration::from_secs(15),
-                duration: Duration::from_secs(15),
-            });
-        }
-
-        let prompt = {
-            let rooms = state.rooms.lock().await;
-            rooms.get(&room_code).expect("room exists").prompt.clone()
-        };
-        handle_submission(&state, &room_code, pid, prompt).await;
-
-        let rooms = state.rooms.lock().await;
-        let player = rooms
-            .get(&room_code)
-            .and_then(|r| r.players.get(&pid))
-            .expect("player exists");
-        assert_eq!(
-            player.size, DEFAULT_START_SIZE,
-            "frozen player should not gain points"
-        );
-    }
-
-    #[tokio::test]
     async fn double_points_doubles_growth() {
         use crate::powerup::PowerUpKind;
 
@@ -1241,7 +1197,7 @@ mod tests {
             room.next_offer_id += 1;
             room.powerup_offers.push(PowerUpOffer {
                 offer_id,
-                kind: PowerUpKind::FreezeAllCompetitors,
+                kind: PowerUpKind::DoublePoints,
                 player_id: pid,
                 expires_at: Instant::now() + Duration::from_secs(30),
             });
@@ -1259,7 +1215,7 @@ mod tests {
         assert_eq!(room.active_powerups.len(), 1, "one active power-up");
         assert_eq!(
             room.active_powerups[0].kind,
-            PowerUpKind::FreezeAllCompetitors
+            PowerUpKind::DoublePoints
         );
         assert_eq!(room.active_powerups[0].source_player_id, pid);
     }

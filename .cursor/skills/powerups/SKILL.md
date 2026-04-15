@@ -38,7 +38,7 @@ The baseline player count is 5 (where current base values apply at 1.0x).
 
 1. Add variant to `PowerUpKind` enum in `core/src/powerup.rs` and `ALL_KINDS` array.
 2. Add base duration to `effect_duration` match arm.
-3. Implement runtime effect checks (see `is_player_frozen`, `has_double_points` as patterns).
+3. Implement runtime effect checks (see `has_double_points`, `has_ongoing_score_steal` as patterns).
 4. Handle activation side-effects in `handle_submission` in `server.rs` if the power-up has an instant effect (like `ScoreSteal`).
 5. Add `PowerUpKind` variant string to `client/src/lib/game/protocol.ts` (`isPowerUpKind`).
 6. Add metadata entry in `POWERUP_META` in `+page.svelte`.

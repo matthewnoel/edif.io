@@ -33,12 +33,6 @@
 	};
 
 	const POWERUP_META: Record<PowerUpKind, PowerUpMeta> = {
-		freezeAllCompetitors: {
-			emoji: '\u{1F976}',
-			label: 'Frozen!',
-			affectsSelf: false,
-			disablesInput: true
-		},
 		doublePoints: {
 			emoji: '\u{1F4AA}',
 			label: '2x Points',

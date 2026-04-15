@@ -7,7 +7,6 @@ export type ErrorCode =
 	| 'playerNotInRoom';
 
 export type PowerUpKind =
-	| 'freezeAllCompetitors'
 	| 'doublePoints'
 	| 'scrambleFont'
 	| 'scoreSteal'
@@ -154,7 +153,6 @@ function isErrorCode(value: unknown): value is ErrorCode {
 }
 
 const VALID_POWERUP_KINDS: PowerUpKind[] = [
-	'freezeAllCompetitors',
 	'doublePoints',
 	'scrambleFont',
 	'scoreSteal',

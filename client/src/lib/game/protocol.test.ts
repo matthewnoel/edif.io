@@ -63,7 +63,7 @@ describe('decodeServerMessage', () => {
 					hostPlayerId: 1,
 					activePowerups: [
 						{
-							kind: 'freezeAllCompetitors',
+							kind: 'scrambleFont',
 							sourcePlayerId: 2,
 							remainingMs: 10000,
 							durationMs: 15000
@@ -150,7 +150,7 @@ describe('decodeServerMessage', () => {
 				type: 'powerUpOffered',
 				offerId: 5,
 				playerId: 2,
-				kind: 'freezeAllCompetitors',
+				kind: 'scrambleFont',
 				expiresInMs: 30000
 			})
 		);
@@ -187,7 +187,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'powerUpEffectEnded',
 				playerId: 1,
-				kind: 'freezeAllCompetitors'
+				kind: 'scrambleFont'
 			})
 		);
 		expect(parsed?.type).toBe('powerUpEffectEnded');
