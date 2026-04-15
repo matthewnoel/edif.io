@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
 	import faviconSvg from '$lib/assets/favicon.svg';
 	import faviconIco from '$lib/assets/favicon.ico';
 	import favicon32 from '$lib/assets/favicon-32x32.png';
@@ -20,3 +21,4 @@
 </svelte:head>
 
 {@render children()}
+<UpdateBanner />
