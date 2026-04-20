@@ -1191,7 +1191,10 @@ mod tests {
             let rooms = state.rooms.lock().await;
             let room = rooms.get(&room_code).expect("room exists");
             assert!(room.match_deadline.is_some());
-            room.players.get(&pid).map(|p| !p.prompt.is_empty()).unwrap_or(false)
+            room.players
+                .get(&pid)
+                .map(|p| !p.prompt.is_empty())
+                .unwrap_or(false)
         };
         assert!(has_prompt);
         let prompt = {
