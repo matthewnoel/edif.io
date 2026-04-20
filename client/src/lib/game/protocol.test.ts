@@ -81,6 +81,7 @@ describe('decodeServerMessage', () => {
 			JSON.stringify({
 				type: 'promptState',
 				roomCode: 'ABCD',
+				playerId: 1,
 				roundId: 2,
 				prompt: 'world'
 			})
