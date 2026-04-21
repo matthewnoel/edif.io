@@ -2,6 +2,8 @@
 
 - Thin Rust binary: boots `core` websocket runtime and registers adapters.
 - Entry: `src/main.rs`. No gameplay logic here.
+- Full-stack integration tests in `tests/integration.rs` drive real
+  HTTP + WebSocket traffic over TCP; add new end-to-end coverage there.
 
 ## Env Vars
 - `BIND_ADDR` (default `0.0.0.0:4000`)
@@ -18,3 +20,8 @@
 ## Rules
 - Keep this crate thin: orchestration only, not gameplay logic.
 - Register adapters explicitly; preserve stable `game_key()` values.
+- The workspace `core` crate is imported here as `edif_core` (via a
+  `package = "core"` rename in `Cargo.toml`) to avoid shadowing
+  `::core`, which breaks `tokio::test` macro expansion. Use
+  `edif_core::...` in this crate, not `core::...`.
+
