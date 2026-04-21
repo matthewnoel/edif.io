@@ -15,30 +15,30 @@
 </script>
 
 {#if !dismissed}
-	<div class="overlay" role="presentation" onclick={dismiss}>
-		<div
-			class="rules-card"
-			role="dialog"
-			aria-label="How to Play"
-			onclick={(e) => e.stopPropagation()}
-		>
+	<div
+		class="overlay"
+		role="presentation"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) dismiss();
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				dismiss();
+			}
+		}}
+	>
+		<div class="rules-card" role="dialog" aria-label="How to Play" tabindex="-1">
 			<div class="card-header">
 				<h2>How to Play</h2>
 				<CloseButton onclick={dismiss} ariaLabel="Dismiss rules" />
 			</div>
 			<ul>
-				<li>Answer prompts correctly to <strong>grow</strong> your blob</li>
+				<li>Answer correctly to <strong>grow</strong> your blob</li>
 				<li>Wrong answers make you <strong>shrink</strong></li>
-				<li>The <strong>biggest blob</strong> when time runs out wins</li>
+				<li>Players will receieve <strong>power-ups</strong> during the match</li>
+				<li>The <strong>biggest blob</strong> wins once the timer runs out</li>
 			</ul>
-			<h3>Power-Ups</h3>
-			<ul>
-				<li>💪 <strong>2x Points</strong> — doubles your growth for 30s</li>
-				<li>🤪 <strong>Scrambled!</strong> — scrambles opponents' prompts for 20s</li>
-				<li>🐢 <strong>Blue Shell!</strong> — instantly steal points from the leader</li>
-				<li>🍕 <strong>Point Eater!</strong> — continuously drain the leader's points for 30s</li>
-			</ul>
-			<p class="hint">Trailing players get power-ups more often. The leader gets none!</p>
 			<div class="footer">
 				<Button label="Got it!" onclick={dismiss} />
 			</div>
@@ -84,11 +84,6 @@
 		font-size: 1.1rem;
 	}
 
-	h3 {
-		margin: 0.35rem 0 0 0;
-		font-size: 0.95rem;
-	}
-
 	ul {
 		margin: 0;
 		padding: 0 0 0 1.25rem;
@@ -96,12 +91,6 @@
 		flex-direction: column;
 		gap: 0.3rem;
 		font-size: 0.9rem;
-	}
-
-	.hint {
-		margin: 0.25rem 0 0 0;
-		font-size: 0.8rem;
-		color: #6b7280;
 	}
 
 	.footer {
