@@ -652,46 +652,53 @@
 		padding: 0.5rem;
 		box-sizing: border-box;
 		text-wrap: nowrap;
+		color: #fff;
+		text-shadow:
+			0 0 3px rgba(0, 0, 0, 0.9),
+			0 1px 2px rgba(0, 0, 0, 0.9);
 		transition:
 			width 180ms linear,
 			height 180ms linear;
 	}
 
 	.blob.me {
-		outline: 4px solid #111;
-		outline-offset: 3px;
 		box-shadow:
-			0 0 0 2px #fff,
-			0 0 18px 4px color-mix(in srgb, var(--blob-color) 70%, transparent);
+			inset 0 0 0 3px #fff,
+			0 0 0 3px #111,
+			0 0 22px 6px color-mix(in srgb, var(--blob-color) 75%, transparent);
 		z-index: 1;
-		animation: me-pulse 1.6s ease-in-out infinite;
+		animation: me-pulse 1.8s ease-in-out infinite;
 	}
 
 	@keyframes me-pulse {
 		0%,
 		100% {
 			box-shadow:
-				0 0 0 2px #fff,
-				0 0 14px 2px color-mix(in srgb, var(--blob-color) 60%, transparent);
+				inset 0 0 0 3px #fff,
+				0 0 0 3px #111,
+				0 0 16px 3px color-mix(in srgb, var(--blob-color) 60%, transparent);
 		}
 		50% {
 			box-shadow:
-				0 0 0 2px #fff,
-				0 0 22px 8px color-mix(in srgb, var(--blob-color) 85%, transparent);
+				inset 0 0 0 3px #fff,
+				0 0 0 3px #111,
+				0 0 28px 10px color-mix(in srgb, var(--blob-color) 90%, transparent);
 		}
 	}
 
 	.you-tag {
 		justify-self: center;
-		background: #111;
-		color: #fff;
+		background: #fff;
+		color: #111;
 		font-size: 0.7rem;
-		font-weight: 800;
-		letter-spacing: 0.1em;
-		padding: 0.1rem 0.45rem;
+		font-weight: 900;
+		letter-spacing: 0.12em;
+		padding: 0.12rem 0.5rem;
 		border-radius: 9999px;
 		white-space: nowrap;
 		pointer-events: none;
+		text-shadow: none;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 	}
 
 	.name {
