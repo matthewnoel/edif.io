@@ -18,7 +18,7 @@
 		loadRejoinToken,
 		disconnect
 	} from '$lib/game/connection.svelte';
-	import { nextBlobLayout, type BlobLayout } from '$lib/game/sim';
+	import { nextBlobLayout, blobRadius, type BlobLayout } from '$lib/game/sim';
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
@@ -239,7 +239,12 @@
 	}
 
 	function circleSize(player: PlayerSnapshot): number {
-		return Math.max(42, Math.min(220, player.size * 4));
+		const width = arenaEl?.clientWidth ?? 0;
+		const height = arenaEl?.clientHeight ?? 0;
+		if (width === 0 || height === 0) {
+			return Math.max(42, Math.min(220, player.size * 4));
+		}
+		return blobRadius(player, width, height) * 2;
 	}
 
 	function leaveRoom(): void {
@@ -416,6 +421,9 @@
 					class="blob {player.id === gs.playerId ? 'me' : ''}"
 					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
 				>
+					{#if player.id === gs.playerId}
+						<div class="you-tag">YOU</div>
+					{/if}
 					<div class="name">{player.name}</div>
 					<div class="powerup-emojis">{playerPowerUpEmojis(player.id)}</div>
 					<div class="size">{player.size.toFixed(1)}</div>
@@ -644,13 +652,53 @@
 		padding: 0.5rem;
 		box-sizing: border-box;
 		text-wrap: nowrap;
+		color: #fff;
+		text-shadow:
+			0 0 3px rgba(0, 0, 0, 0.9),
+			0 1px 2px rgba(0, 0, 0, 0.9);
 		transition:
 			width 180ms linear,
 			height 180ms linear;
 	}
 
 	.blob.me {
-		outline: 2px solid;
+		box-shadow:
+			inset 0 0 0 3px #fff,
+			0 0 0 3px #111,
+			0 0 22px 6px color-mix(in srgb, var(--blob-color) 75%, transparent);
+		z-index: 1;
+		animation: me-pulse 1.8s ease-in-out infinite;
+	}
+
+	@keyframes me-pulse {
+		0%,
+		100% {
+			box-shadow:
+				inset 0 0 0 3px #fff,
+				0 0 0 3px #111,
+				0 0 16px 3px color-mix(in srgb, var(--blob-color) 60%, transparent);
+		}
+		50% {
+			box-shadow:
+				inset 0 0 0 3px #fff,
+				0 0 0 3px #111,
+				0 0 28px 10px color-mix(in srgb, var(--blob-color) 90%, transparent);
+		}
+	}
+
+	.you-tag {
+		justify-self: center;
+		background: #fff;
+		color: #111;
+		font-size: 0.7rem;
+		font-weight: 900;
+		letter-spacing: 0.12em;
+		padding: 0.12rem 0.5rem;
+		border-radius: 9999px;
+		white-space: nowrap;
+		pointer-events: none;
+		text-shadow: none;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 	}
 
 	.name {
