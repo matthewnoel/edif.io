@@ -1,4 +1,4 @@
-use core::{ServerConfig, run_server};
+use edif_core::{ServerConfig, run_server};
 use edif_io_arithmetic_adapter::ArithmeticAdapter;
 use edif_io_keyboarding_adapter::KeyboardingAdapter;
 use edif_io_state_abbreviations_adapter::StateAbbreviationsAdapter;

@@ -4,8 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-core = { path = "../core" }
+edif_core = { path = "../core", package = "core" }
 edif-io-keyboarding-adapter = { path = "../adapters/keyboarding" }
 edif-io-arithmetic-adapter = { path = "../adapters/arithmetic" }
 edif-io-state-abbreviations-adapter = { path = "../adapters/state-abbreviations" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+axum = { version = "0.8", features = ["ws"] }
+futures-util = "0.3"
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "io-util"] }
+tokio-tungstenite = "0.28"

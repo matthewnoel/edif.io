@@ -7,4 +7,4 @@ pub mod server;
 pub use adapter::{
     AdapterHandle, GameAdapter, OptionField, OptionFieldKind, SelectChoice, VisibleWhen,
 };
-pub use server::{ServerConfig, run_server};
+pub use server::{ServerConfig, build_app, run_server};

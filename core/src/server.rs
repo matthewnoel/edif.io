@@ -62,7 +62,7 @@ struct SharedState {
     prompt_seed: AtomicU64,
 }
 
-pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> Result<(), String> {
+pub fn build_app(adapters: Vec<AdapterHandle>, config: ServerConfig) -> Result<Router, String> {
     let default_game_key = adapters
         .first()
         .map(|adapter| adapter.game_key().to_string())
@@ -73,7 +73,7 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
         adapters,
         adapter_order,
         default_game_key,
-        config: config.clone(),
+        config,
         rooms: Mutex::new(HashMap::new()),
         connections: Mutex::new(HashMap::new()),
         rejoin_tokens: Mutex::new(HashMap::new()),
@@ -85,16 +85,19 @@ pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> R
         ),
     });
 
-    let app = Router::new()
+    Ok(Router::new()
         .route("/healthz", get(health_handler))
         .route("/readyz", get(health_handler))
         .route("/api/game-modes", get(game_modes_handler))
         .route("/ws", get(ws_handler))
-        .with_state(state);
+        .with_state(state))
+}
 
+pub async fn run_server(adapters: Vec<AdapterHandle>, config: ServerConfig) -> Result<(), String> {
     let listener = TcpListener::bind(&config.bind_addr)
         .await
         .map_err(|e| format!("failed to bind {}: {e}", config.bind_addr))?;
+    let app = build_app(adapters, config)?;
 
     axum::serve(listener, app)
         .await
