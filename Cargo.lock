@@ -676,11 +676,15 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "core",
  "edif-io-arithmetic-adapter",
  "edif-io-keyboarding-adapter",
  "edif-io-state-abbreviations-adapter",
+ "futures-util",
+ "serde_json",
  "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
