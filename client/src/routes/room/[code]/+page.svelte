@@ -18,7 +18,7 @@
 		loadRejoinToken,
 		disconnect
 	} from '$lib/game/connection.svelte';
-	import { nextBlobLayout, type BlobLayout } from '$lib/game/sim';
+	import { nextBlobLayout, blobRadius, type BlobLayout } from '$lib/game/sim';
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
@@ -239,7 +239,12 @@
 	}
 
 	function circleSize(player: PlayerSnapshot): number {
-		return Math.max(42, Math.min(220, player.size * 4));
+		const width = arenaEl?.clientWidth ?? 0;
+		const height = arenaEl?.clientHeight ?? 0;
+		if (width === 0 || height === 0) {
+			return Math.max(42, Math.min(220, player.size * 4));
+		}
+		return blobRadius(player, width, height) * 2;
 	}
 
 	function leaveRoom(): void {
@@ -416,6 +421,9 @@
 					class="blob {player.id === gs.playerId ? 'me' : ''}"
 					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
 				>
+					{#if player.id === gs.playerId}
+						<div class="you-tag">YOU</div>
+					{/if}
 					<div class="name">{player.name}</div>
 					<div class="powerup-emojis">{playerPowerUpEmojis(player.id)}</div>
 					<div class="size">{player.size.toFixed(1)}</div>
@@ -650,7 +658,40 @@
 	}
 
 	.blob.me {
-		outline: 2px solid;
+		outline: 4px solid #111;
+		outline-offset: 3px;
+		box-shadow:
+			0 0 0 2px #fff,
+			0 0 18px 4px color-mix(in srgb, var(--blob-color) 70%, transparent);
+		z-index: 1;
+		animation: me-pulse 1.6s ease-in-out infinite;
+	}
+
+	@keyframes me-pulse {
+		0%,
+		100% {
+			box-shadow:
+				0 0 0 2px #fff,
+				0 0 14px 2px color-mix(in srgb, var(--blob-color) 60%, transparent);
+		}
+		50% {
+			box-shadow:
+				0 0 0 2px #fff,
+				0 0 22px 8px color-mix(in srgb, var(--blob-color) 85%, transparent);
+		}
+	}
+
+	.you-tag {
+		justify-self: center;
+		background: #111;
+		color: #fff;
+		font-size: 0.7rem;
+		font-weight: 800;
+		letter-spacing: 0.1em;
+		padding: 0.1rem 0.45rem;
+		border-radius: 9999px;
+		white-space: nowrap;
+		pointer-events: none;
 	}
 
 	.name {
