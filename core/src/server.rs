@@ -17,7 +17,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
+use rand::{Rng, RngExt};
 use rand::distr::Alphanumeric;
 use serde::Serialize;
 use std::collections::HashMap;
