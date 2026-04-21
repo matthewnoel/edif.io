@@ -1,5 +1,5 @@
 use crate::game::PlayerId;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 

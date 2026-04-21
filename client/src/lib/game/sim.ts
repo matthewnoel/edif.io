@@ -40,8 +40,8 @@ export function nextBlobLayout(
 		const previous = current[player.id] ?? { x: centerX, y: centerY };
 		const radius = blobRadius(player, width, height);
 
-		let targetX = centerX;
-		let targetY = centerY;
+		let targetX: number;
+		let targetY: number;
 
 		if (player.id !== largest.id) {
 			const orbitIndex = index - 1;
