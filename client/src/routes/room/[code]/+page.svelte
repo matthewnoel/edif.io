@@ -280,13 +280,15 @@
 </script>
 
 <main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
+	{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
+		<RulesDialog />
+	{/if}
 	<div class="leave">
 		<Button label="Leave" onclick={leaveRoom} />
 	</div>
 	<header>
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
 			<div class="lobby">
-				<RulesDialog />
 				{#if gs.playerId === gs.room.hostPlayerId}
 					<div class="lobby-start">
 						<Button label="Start Match" onclick={startMatch} />
@@ -481,11 +483,7 @@
 
 	.lobby {
 		text-align: center;
-		margin-top: 3rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1.5rem;
+		margin-top: 6rem;
 	}
 
 	.host {
