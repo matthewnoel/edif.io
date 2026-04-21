@@ -16,7 +16,12 @@
 
 {#if !dismissed}
 	<div class="overlay" role="presentation" onclick={dismiss}>
-		<div class="rules-card" role="dialog" aria-label="How to Play" onclick={(e) => e.stopPropagation()}>
+		<div
+			class="rules-card"
+			role="dialog"
+			aria-label="How to Play"
+			onclick={(e) => e.stopPropagation()}
+		>
 			<div class="card-header">
 				<h2>How to Play</h2>
 				<CloseButton onclick={dismiss} ariaLabel="Dismiss rules" />
