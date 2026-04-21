@@ -27,8 +27,6 @@ export type PlayerSnapshot = {
 export type RoomSnapshot = {
 	roomCode: string;
 	players: PlayerSnapshot[];
-	prompt: string;
-	roundId: number;
 	matchWinner: number | null;
 	matchRemainingMs: number | null;
 	hostPlayerId: number;
@@ -103,7 +101,7 @@ export type ServerMessage =
 			rejoinToken: string;
 	  }
 	| { type: 'roomState'; room: RoomSnapshot }
-	| { type: 'promptState'; roomCode: string; roundId: number; prompt: string }
+	| { type: 'promptState'; roomCode: string; playerId: number; roundId: number; prompt: string }
 	| { type: 'raceProgress'; roomCode: string; playerId: number; text: string }
 	| {
 			type: 'roundResult';
@@ -185,8 +183,6 @@ function isRoomSnapshot(value: unknown): value is RoomSnapshot {
 	if (!isObject(value) || !Array.isArray(value.players)) return false;
 	return (
 		typeof value.roomCode === 'string' &&
-		typeof value.prompt === 'string' &&
-		typeof value.roundId === 'number' &&
 		(value.matchWinner === null || typeof value.matchWinner === 'number') &&
 		(value.matchRemainingMs === null || typeof value.matchRemainingMs === 'number') &&
 		typeof value.hostPlayerId === 'number' &&
@@ -215,6 +211,7 @@ function isServerMessage(value: unknown): value is ServerMessage {
 		case 'promptState':
 			return (
 				typeof value.roomCode === 'string' &&
+				typeof value.playerId === 'number' &&
 				typeof value.roundId === 'number' &&
 				typeof value.prompt === 'string'
 			);

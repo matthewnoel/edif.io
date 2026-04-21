@@ -71,6 +71,7 @@ export const gs = $state({
 	inputPlaceholder: '',
 	inputMode: 'text' as 'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal',
 	promptInput: '',
+	myPrompt: '',
 	latestRoundSummary: '',
 	latestRoundSummaryColor: '',
 	errorMessage: '',
@@ -117,21 +118,17 @@ function handleServerMessage(message: ServerMessage): void {
 			if (message.room.matchWinner) {
 				gs.pendingPowerUps = [];
 				gs.powerUpToast = null;
+				gs.myPrompt = '';
 				const winner = message.room.players.find((p) => p.id === message.room.matchWinner);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.room.matchWinner}`} wins the match`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';
 			}
 			break;
 		case 'promptState':
-			if (gs.room) {
-				gs.room = {
-					...gs.room,
-					prompt: message.prompt,
-					roundId: message.roundId,
-					players: gs.room.players.map((p) => ({ ...p, progress: '' }))
-				};
+			if (message.playerId === gs.playerId) {
+				gs.myPrompt = message.prompt;
+				gs.promptInput = '';
 			}
-			gs.promptInput = '';
 			break;
 		case 'raceProgress':
 			if (!gs.room) break;
@@ -148,7 +145,6 @@ function handleServerMessage(message: ServerMessage): void {
 				const winner = gs.room.players.find((p) => p.id === message.winnerPlayerId);
 				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.winnerPlayerId}`} won +${message.growthAwarded.toFixed(1)} size`;
 				gs.latestRoundSummaryColor = winner?.color ?? '';
-				gs.promptInput = '';
 			}
 			break;
 		case 'wrongAnswer':
@@ -277,6 +273,7 @@ export function connect(
 		}
 		gs.phase = 'pregame';
 		gs.room = null;
+		gs.myPrompt = '';
 		if (wasActive) {
 			disconnectCallback?.();
 		}
@@ -288,6 +285,7 @@ export function disconnect(): void {
 	socket = null;
 	gs.phase = 'pregame';
 	gs.room = null;
+	gs.myPrompt = '';
 }
 
 export function socketStateLabel(): string {
@@ -315,6 +313,7 @@ export function rematch(): void {
 	gs.latestRoundSummary = '';
 	gs.latestRoundSummaryColor = '';
 	gs.promptInput = '';
+	gs.myPrompt = '';
 	gs.pendingPowerUps = [];
 	sendClientMessage({ type: 'rematch' });
 }

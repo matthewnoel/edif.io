@@ -63,6 +63,8 @@ pub enum ServerMessage {
     PromptState {
         #[serde(rename = "roomCode")]
         room_code: String,
+        #[serde(rename = "playerId")]
+        player_id: PlayerId,
         #[serde(rename = "roundId")]
         round_id: u64,
         prompt: String,

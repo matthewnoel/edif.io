@@ -177,7 +177,7 @@
 	});
 
 	$effect(() => {
-		if (gs.room?.prompt && promptInputEl) {
+		if (gs.myPrompt && promptInputEl) {
 			promptInputEl.focus();
 		}
 	});
@@ -299,9 +299,9 @@
 					<strong>{formatTimer(timerDisplayMs)}</strong>
 				</div>
 			{/if}
-			{#if gs.room?.prompt}
+			{#if gs.myPrompt}
 				<div class="prompt" class:shizuru-regular={promptScrambled}>
-					<strong>{gs.room?.prompt}</strong>
+					<strong>{gs.myPrompt}</strong>
 				</div>
 			{:else if !gs.room?.matchWinner}
 				<div class="prompt">
@@ -361,7 +361,7 @@
 							{/each}
 						</div>
 					{/if}
-					{#if gs.room?.prompt}
+					{#if gs.myPrompt}
 						<div class="input-container" class:disabled={inputDisabled}>
 							<TextInput
 								bind:el={promptInputEl}

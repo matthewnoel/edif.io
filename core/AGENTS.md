@@ -15,3 +15,4 @@
 - Room lifecycle: creator is host, match starts on `StartMatch`, lobby-first.
 - Win: configurable duration (default 60s), largest player at expiry wins.
 - No player consumption; all players stay for full match.
+- Prompts are per-player: each player has their own independent prompt (`PlayerState.prompt`). `PromptState` messages are sent to individual players via `send_to_player`, not broadcast. Players answer at their own pace without interrupting each other.

@@ -28,6 +28,8 @@ pub struct PlayerState {
     pub connected: bool,
     pub progress: String,
     pub rejoin_token: String,
+    pub prompt: String,
+    pub prompt_id: u64,
 }
 
 impl PlayerState {
@@ -48,8 +50,6 @@ impl PlayerState {
 pub struct RoomSnapshot {
     pub room_code: String,
     pub players: Vec<PlayerSnapshot>,
-    pub prompt: String,
-    pub round_id: u64,
     pub match_winner: Option<PlayerId>,
     pub match_remaining_ms: Option<u64>,
     pub host_player_id: PlayerId,
@@ -62,8 +62,6 @@ pub struct RoomState {
     pub game_key: String,
     pub game_options: serde_json::Value,
     pub players: HashMap<PlayerId, PlayerState>,
-    pub prompt: String,
-    pub round_id: u64,
     pub match_winner: Option<PlayerId>,
     pub match_deadline: Option<Instant>,
     pub match_duration_secs: u64,
@@ -78,14 +76,14 @@ impl RoomState {
     pub fn reset_for_rematch(&mut self) {
         self.match_winner = None;
         self.match_deadline = None;
-        self.prompt.clear();
-        self.round_id = 0;
         self.powerup_offers.clear();
         self.active_powerups.clear();
         self.next_offer_id = 0;
         for player in self.players.values_mut() {
             player.size = DEFAULT_START_SIZE;
             player.progress.clear();
+            player.prompt.clear();
+            player.prompt_id = 0;
         }
     }
 
@@ -114,8 +112,6 @@ impl RoomState {
         RoomSnapshot {
             room_code: self.room_code.clone(),
             players,
-            prompt: self.prompt.clone(),
-            round_id: self.round_id,
             match_winner: self.match_winner,
             match_remaining_ms,
             host_player_id: self.host_player_id,
@@ -208,7 +204,6 @@ pub fn resolve_match_by_timer(room: &mut RoomState) {
     if let Some(w) = winner {
         room.match_winner = Some(w.id);
     }
-    room.prompt.clear();
 }
 
 #[cfg(test)]
@@ -225,6 +220,8 @@ mod tests {
             connected: true,
             progress: String::new(),
             rejoin_token: String::new(),
+            prompt: String::new(),
+            prompt_id: 0,
         }
     }
 
@@ -234,8 +231,6 @@ mod tests {
             game_key: "keyboarding".to_string(),
             game_options: serde_json::Value::Null,
             players: HashMap::from([(1, player(1, 10.0)), (2, player(2, 10.0))]),
-            prompt: "abc".to_string(),
-            round_id: 1,
             match_winner: None,
             match_deadline: None,
             match_duration_secs: 60,
@@ -277,7 +272,6 @@ mod tests {
         room.players.get_mut(&2).unwrap().size = 20.0;
         resolve_match_by_timer(&mut room);
         assert_eq!(room.match_winner, Some(1));
-        assert!(room.prompt.is_empty());
     }
 
     #[test]
@@ -296,11 +290,11 @@ mod tests {
         let mut room = test_room();
         room.match_winner = Some(1);
         room.match_deadline = Some(Instant::now());
-        room.prompt = "old prompt".to_string();
-        room.round_id = 5;
         room.players.get_mut(&1).unwrap().size = 30.0;
         room.players.get_mut(&2).unwrap().size = 20.0;
         room.players.get_mut(&1).unwrap().progress = "partial".to_string();
+        room.players.get_mut(&1).unwrap().prompt = "old prompt".to_string();
+        room.players.get_mut(&1).unwrap().prompt_id = 5;
         room.next_offer_id = 5;
         room.powerup_offers.push(PowerUpOffer {
             offer_id: 4,
@@ -319,15 +313,15 @@ mod tests {
 
         assert_eq!(room.match_winner, None);
         assert!(room.match_deadline.is_none());
-        assert!(room.prompt.is_empty());
         assert!(room.powerup_offers.is_empty());
         assert!(room.active_powerups.is_empty());
         assert_eq!(room.next_offer_id, 0);
-        assert_eq!(room.round_id, 0);
         assert_eq!(room.players.len(), 2);
         assert_eq!(room.players.get(&1).unwrap().size, DEFAULT_START_SIZE);
         assert_eq!(room.players.get(&2).unwrap().size, DEFAULT_START_SIZE);
         assert!(room.players.get(&1).unwrap().progress.is_empty());
+        assert!(room.players.get(&1).unwrap().prompt.is_empty());
+        assert_eq!(room.players.get(&1).unwrap().prompt_id, 0);
     }
 
     #[test]

@@ -222,6 +222,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                         );
 
                         let _ = broadcast_room_state(&state, &code).await;
+                        // Assign a prompt if the match is already running
+                        let _ = ensure_prompt_for_player(&state, &code, assigned_player_id).await;
                     }
                     Err(JoinError::RoomNotFound(code)) => {
                         let _ = send_server_message(
@@ -292,10 +294,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     };
                     player.connected = true;
 
-                    if room.prompt.is_empty() {
+                    if player.prompt.is_empty() {
                         None
                     } else {
-                        Some((room.round_id, room.prompt.clone()))
+                        Some((player.prompt_id, player.prompt.clone()))
                     }
                 };
 
@@ -340,6 +342,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                         &client_tx,
                         &ServerMessage::PromptState {
                             room_code: found_code,
+                            player_id: found_pid,
                             round_id,
                             prompt,
                         },
@@ -423,8 +426,6 @@ async fn join_or_create_room(
                     game_key: room_game_key,
                     game_options: requested_game_options.unwrap_or(serde_json::Value::Null),
                     players: HashMap::new(),
-                    prompt: String::new(),
-                    round_id: 0,
                     match_winner: None,
                     match_deadline: None,
                     match_duration_secs: duration,
@@ -456,6 +457,8 @@ async fn join_or_create_room(
             connected: true,
             progress: String::new(),
             rejoin_token: token.clone(),
+            prompt: String::new(),
+            prompt_id: 0,
         },
     );
 
@@ -510,7 +513,7 @@ async fn handle_submission(
     let Some(adapter) = adapter_for_room(state, room_code).await else {
         return;
     };
-    let mut should_advance_round = false;
+    let mut should_advance_prompt = false;
     let mut round_result: Option<ServerMessage> = None;
     let mut wrong_answer_msg: Option<ServerMessage> = None;
     let mut earned_powerups: Vec<ServerMessage> = Vec::new();
@@ -521,11 +524,16 @@ async fn handle_submission(
             return;
         };
 
-        if room.match_winner.is_some() || room.prompt.is_empty() {
+        if room.match_winner.is_some() {
             return;
         }
 
-        if !adapter.is_correct(&room.prompt, &text) {
+        let (player_prompt, player_prompt_id) = match room.players.get(&player_id) {
+            Some(p) if !p.prompt.is_empty() => (p.prompt.clone(), p.prompt_id),
+            _ => return,
+        };
+
+        if !adapter.is_correct(&player_prompt, &text) {
             let penalty = state.config.shrink_per_wrong_answer;
             if let Some(shrink) = apply_wrong_answer_penalty(room, player_id, penalty) {
                 wrong_answer_msg = Some(ServerMessage::WrongAnswer {
@@ -537,7 +545,7 @@ async fn handle_submission(
         } else {
             let configured_growth = state.config.growth_per_round_win;
             let mut growth = adapter
-                .score_for_prompt(&room.prompt)
+                .score_for_prompt(&player_prompt)
                 .max(configured_growth);
 
             if has_double_points(&room.active_powerups, player_id) {
@@ -547,11 +555,11 @@ async fn handle_submission(
             if let Some(resolution) = apply_round_win(room, player_id, growth) {
                 round_result = Some(ServerMessage::RoundResult {
                     room_code: room_code.to_string(),
-                    round_id: room.round_id,
+                    round_id: player_prompt_id,
                     winner_player_id: resolution.round_winner,
                     growth_awarded: growth,
                 });
-                should_advance_round = room.match_winner.is_none();
+                should_advance_prompt = room.match_winner.is_none();
 
                 if has_ongoing_score_steal(&room.active_powerups, player_id) {
                     deduct_from_top_players(room, growth, player_id);
@@ -618,8 +626,8 @@ async fn handle_submission(
         let _ = broadcast_room_state(state, room_code).await;
     }
 
-    if should_advance_round {
-        let _ = ensure_prompt_for_room(state, room_code).await;
+    if should_advance_prompt {
+        let _ = ensure_prompt_for_player(state, room_code, player_id).await;
     }
 }
 
@@ -642,7 +650,7 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
     start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
 
     let _ = broadcast_room_state(state, room_code).await;
-    let _ = ensure_prompt_for_room(state, room_code).await;
+    ensure_prompts_for_all_players(state, room_code).await;
 }
 
 async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
@@ -665,7 +673,7 @@ async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
     start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
 
     let _ = broadcast_room_state(state, room_code).await;
-    let _ = ensure_prompt_for_room(state, room_code).await;
+    ensure_prompts_for_all_players(state, room_code).await;
 }
 
 fn splitmix64(val: u64) -> u64 {
@@ -675,7 +683,11 @@ fn splitmix64(val: u64) -> u64 {
     z ^ (z >> 31)
 }
 
-async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bool {
+async fn ensure_prompt_for_player(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+) -> bool {
     let Some(adapter) = adapter_for_room(state, room_code).await else {
         return false;
     };
@@ -685,25 +697,31 @@ async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bo
         let Some(room) = rooms.get_mut(room_code) else {
             return false;
         };
-        if room.match_winner.is_some() || room.players.is_empty() || room.match_deadline.is_none() {
+        if room.match_winner.is_some() || room.match_deadline.is_none() {
+            return false;
+        }
+        let Some(player) = room.players.get_mut(&player_id) else {
+            return false;
+        };
+        if !player.connected {
             return false;
         }
         let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
         let seed = splitmix64(raw_seed);
-        room.round_id += 1;
-        room.prompt = adapter.next_prompt(seed, &room.game_options);
-        for player in room.players.values_mut() {
-            player.progress.clear();
-        }
-        prompt_update = (room.round_id, room.prompt.clone());
+        player.prompt_id += 1;
+        player.prompt = adapter.next_prompt(seed, &room.game_options);
+        player.progress.clear();
+        prompt_update = (player.prompt_id, player.prompt.clone());
     }
 
     let (round_id, prompt) = prompt_update;
-    let _ = broadcast_to_room(
+    let _ = send_to_player(
         state,
         room_code,
+        player_id,
         &ServerMessage::PromptState {
             room_code: room_code.to_string(),
+            player_id,
             round_id,
             prompt,
         },
@@ -711,6 +729,50 @@ async fn ensure_prompt_for_room(state: &Arc<SharedState>, room_code: &str) -> bo
     .await;
 
     true
+}
+
+async fn ensure_prompts_for_all_players(state: &Arc<SharedState>, room_code: &str) {
+    let Some(adapter) = adapter_for_room(state, room_code).await else {
+        return;
+    };
+    let prompt_updates;
+    {
+        let mut rooms = state.rooms.lock().await;
+        let Some(room) = rooms.get_mut(room_code) else {
+            return;
+        };
+        if room.match_winner.is_some() || room.players.is_empty() || room.match_deadline.is_none() {
+            return;
+        }
+        let mut updates: Vec<(PlayerId, u64, String)> = Vec::new();
+        for player in room.players.values_mut() {
+            if !player.connected {
+                continue;
+            }
+            let raw_seed = state.prompt_seed.fetch_add(1, Ordering::Relaxed);
+            let seed = splitmix64(raw_seed);
+            player.prompt_id += 1;
+            player.prompt = adapter.next_prompt(seed, &room.game_options);
+            player.progress.clear();
+            updates.push((player.id, player.prompt_id, player.prompt.clone()));
+        }
+        prompt_updates = updates;
+    }
+
+    for (pid, round_id, prompt) in prompt_updates {
+        let _ = send_to_player(
+            state,
+            room_code,
+            pid,
+            &ServerMessage::PromptState {
+                room_code: room_code.to_string(),
+                player_id: pid,
+                round_id,
+                prompt,
+            },
+        )
+        .await;
+    }
 }
 
 fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: u64) {
@@ -851,6 +913,23 @@ async fn disconnect_player(state: &Arc<SharedState>, room_code: &str, player_id:
     } else {
         let _ = broadcast_room_state(state, room_code).await;
     }
+}
+
+async fn send_to_player(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+    message: &ServerMessage,
+) -> bool {
+    let connections = state.connections.lock().await;
+    let Some(room_connections) = connections.get(room_code) else {
+        return false;
+    };
+    let Some(conn) = room_connections.get(&player_id) else {
+        return false;
+    };
+    drop(send_server_message(&conn.sender, message));
+    true
 }
 
 async fn broadcast_room_state(state: &Arc<SharedState>, room_code: &str) -> bool {
@@ -1112,12 +1191,20 @@ mod tests {
             let rooms = state.rooms.lock().await;
             let room = rooms.get(&room_code).expect("room exists");
             assert!(room.match_deadline.is_some());
-            !room.prompt.is_empty()
+            room.players
+                .get(&pid)
+                .map(|p| !p.prompt.is_empty())
+                .unwrap_or(false)
         };
         assert!(has_prompt);
         let prompt = {
             let rooms = state.rooms.lock().await;
-            rooms.get(&room_code).expect("room exists").prompt.clone()
+            rooms
+                .get(&room_code)
+                .and_then(|r| r.players.get(&pid))
+                .expect("player exists")
+                .prompt
+                .clone()
         };
         assert!(prompt.starts_with("math-"));
 
@@ -1162,7 +1249,12 @@ mod tests {
 
         let prompt = {
             let rooms = state.rooms.lock().await;
-            rooms.get(&room_code).expect("room exists").prompt.clone()
+            rooms
+                .get(&room_code)
+                .and_then(|r| r.players.get(&pid))
+                .expect("player exists")
+                .prompt
+                .clone()
         };
         handle_submission(&state, &room_code, pid, prompt).await;
 
@@ -1205,7 +1297,12 @@ mod tests {
 
         let prompt = {
             let rooms = state.rooms.lock().await;
-            rooms.get(&room_code).expect("room exists").prompt.clone()
+            rooms
+                .get(&room_code)
+                .and_then(|r| r.players.get(&pid))
+                .expect("player exists")
+                .prompt
+                .clone()
         };
         handle_submission(&state, &room_code, pid, prompt).await;
 
