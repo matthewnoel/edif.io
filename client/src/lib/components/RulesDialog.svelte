@@ -1,4 +1,7 @@
 <script lang="ts">
+	import Button from '$lib/components/Button.svelte';
+	import CloseButton from '$lib/components/CloseButton.svelte';
+
 	const STORAGE_KEY = 'rulesDialogDismissed';
 
 	let dismissed = $state(
@@ -13,8 +16,10 @@
 
 {#if !dismissed}
 	<div class="rules-card" role="dialog" aria-label="How to Play">
-		<button class="dismiss-btn" onclick={dismiss} aria-label="Dismiss rules">✕</button>
-		<h2>How to Play</h2>
+		<div class="card-header">
+			<h2>How to Play</h2>
+			<CloseButton onclick={dismiss} ariaLabel="Dismiss rules" />
+		</div>
 		<ul>
 			<li>Answer prompts correctly to <strong>grow</strong> your blob</li>
 			<li>Wrong answers make you <strong>shrink</strong></li>
@@ -28,30 +33,42 @@
 			<li>🍕 <strong>Point Eater!</strong> — continuously drain the leader's points for 30s</li>
 		</ul>
 		<p class="hint">Trailing players get power-ups more often. The leader gets none!</p>
-		<button class="got-it-btn" onclick={dismiss}>Got it!</button>
+		<div class="footer">
+			<Button label="Got it!" onclick={dismiss} />
+		</div>
 	</div>
 {/if}
 
 <style>
 	.rules-card {
-		position: relative;
 		background: white;
 		border: 2px solid black;
 		border-radius: 0.75rem;
 		padding: 1.25rem 1.5rem 1rem;
 		max-width: 420px;
+		width: 100%;
 		margin: 0 auto;
 		text-align: left;
 		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.card-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
 	}
 
 	h2 {
-		margin: 0 0 0.75rem 0;
+		margin: 0;
 		font-size: 1.1rem;
 	}
 
 	h3 {
-		margin: 0.85rem 0 0.5rem 0;
+		margin: 0.35rem 0 0 0;
 		font-size: 0.95rem;
 	}
 
@@ -65,44 +82,13 @@
 	}
 
 	.hint {
-		margin: 0.75rem 0 0.85rem 0;
+		margin: 0.25rem 0 0 0;
 		font-size: 0.8rem;
 		color: #6b7280;
 	}
 
-	.dismiss-btn {
-		position: absolute;
-		top: 0.6rem;
-		right: 0.7rem;
-		background: none;
-		border: none;
-		cursor: pointer;
-		font-size: 1rem;
-		line-height: 1;
-		color: #6b7280;
-		padding: 0.2rem 0.3rem;
-		border-radius: 0.25rem;
-	}
-
-	.dismiss-btn:hover {
-		color: black;
-		background: #f3f4f6;
-	}
-
-	.got-it-btn {
-		display: block;
-		width: 100%;
-		background: none;
-		border: 2px solid black;
-		border-radius: 0.5rem;
-		padding: 0.45rem 1rem;
-		cursor: pointer;
-		font-size: 0.9rem;
-		font-weight: 700;
-	}
-
-	.got-it-btn:hover {
-		background: black;
-		color: white;
+	.footer {
+		display: flex;
+		margin-top: 0.35rem;
 	}
 </style>
