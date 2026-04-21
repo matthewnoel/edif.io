@@ -23,6 +23,7 @@
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
+	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	type PowerUpMeta = {
@@ -285,6 +286,7 @@
 	<header>
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
 			<div class="lobby">
+				<RulesDialog />
 				{#if gs.playerId === gs.room.hostPlayerId}
 					<div class="lobby-start">
 						<Button label="Start Match" onclick={startMatch} />
@@ -479,7 +481,11 @@
 
 	.lobby {
 		text-align: center;
-		margin-top: 6rem;
+		margin-top: 3rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.5rem;
 	}
 
 	.host {
