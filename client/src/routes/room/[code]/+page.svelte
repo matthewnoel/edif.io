@@ -23,6 +23,7 @@
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
+	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	type PowerUpMeta = {
@@ -279,6 +280,9 @@
 </script>
 
 <main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
+	{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
+		<RulesDialog />
+	{/if}
 	<div class="leave">
 		<Button label="Leave" onclick={leaveRoom} />
 	</div>
