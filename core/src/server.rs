@@ -749,11 +749,10 @@ async fn handle_update_room_settings(
                 room.game_key = trimmed;
             }
         }
-        if let Some(duration) = match_duration_secs {
-            if duration > 0 {
+        if let Some(duration) = match_duration_secs
+            && duration > 0 {
                 room.match_duration_secs = duration;
             }
-        }
         if let Some(options) = game_options {
             room.game_options = options;
         }

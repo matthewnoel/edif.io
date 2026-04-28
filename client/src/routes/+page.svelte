@@ -2,7 +2,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
-	import { gs, connect, setOnWelcome, setGameModes, defaultWsUrl } from '$lib/game/connection.svelte';
+	import {
+		gs,
+		connect,
+		setOnWelcome,
+		setGameModes,
+		defaultWsUrl
+	} from '$lib/game/connection.svelte';
 	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';

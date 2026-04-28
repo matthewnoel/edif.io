@@ -105,7 +105,10 @@
 		});
 	});
 
-	function initOptionDefaults(mode: GameModeInfo | undefined, currentOptions: Record<string, unknown> | null): void {
+	function initOptionDefaults(
+		mode: GameModeInfo | undefined,
+		currentOptions: Record<string, unknown> | null
+	): void {
 		if (!mode || mode.options.length === 0) {
 			settingsGameOptions = {};
 			return;
@@ -444,8 +447,7 @@
 									<label class="toggle">
 										<Checkbox
 											checked={settingsGameOptions[opt.key] === 'true'}
-											onchange={(e) =>
-												handleOptionChange(opt.key, String(e.currentTarget.checked))}
+											onchange={(e) => handleOptionChange(opt.key, String(e.currentTarget.checked))}
 										/>
 										<strong>{opt.label}</strong>
 									</label>
@@ -470,7 +472,10 @@
 				{:else}
 					<div class="lobby-settings-readonly shizuru-regular">
 						{#if gs.room.gameKey}
-							<p>{gameModes.find((m) => m.key === gs.room!.gameKey)?.label ?? gs.room.gameKey} · {gs.room.matchDurationSecs}s</p>
+							<p>
+								{gameModes.find((m) => m.key === gs.room!.gameKey)?.label ?? gs.room.gameKey} · {gs
+									.room.matchDurationSecs}s
+							</p>
 						{/if}
 					</div>
 					<div class="lobby-wait shizuru-regular">Waiting for host to start...</div>
