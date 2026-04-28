@@ -707,8 +707,8 @@ async fn handle_update_room_settings(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
 
-    if let Some(ref mode) = validated_game_mode {
-        if !state.adapters.contains_key(mode) {
+    if let Some(ref mode) = validated_game_mode
+        && !state.adapters.contains_key(mode) {
             let _ = send_server_message(
                 sender,
                 &ServerMessage::Error {
@@ -718,7 +718,6 @@ async fn handle_update_room_settings(
             );
             return;
         }
-    }
 
     {
         let mut rooms = state.rooms.lock().await;
@@ -1451,10 +1450,16 @@ mod tests {
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (host_sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, host_pid) =
-            join_or_create_room(&state, None, Some("keyboarding".to_string()), None, None, sender)
-                .await
-                .expect("room created");
+        let (room_code, _token, host_pid) = join_or_create_room(
+            &state,
+            None,
+            Some("keyboarding".to_string()),
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
 
         let initial_generation = {
             let rooms = state.rooms.lock().await;
@@ -1540,10 +1545,16 @@ mod tests {
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (reply_tx, mut reply_rx) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, host_pid) =
-            join_or_create_room(&state, None, Some("keyboarding".to_string()), None, None, sender)
-                .await
-                .expect("room created");
+        let (room_code, _token, host_pid) = join_or_create_room(
+            &state,
+            None,
+            Some("keyboarding".to_string()),
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
 
         handle_update_room_settings(
             &state,
@@ -1572,10 +1583,16 @@ mod tests {
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
         let (host_sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, host_pid) =
-            join_or_create_room(&state, None, Some("arithmetic".to_string()), None, None, sender)
-                .await
-                .expect("room created");
+        let (room_code, _token, host_pid) = join_or_create_room(
+            &state,
+            None,
+            Some("arithmetic".to_string()),
+            None,
+            None,
+            sender,
+        )
+        .await
+        .expect("room created");
 
         handle_start_match(&state, &room_code, host_pid).await;
         let started_generation = {
