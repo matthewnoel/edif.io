@@ -49,6 +49,9 @@ impl PlayerState {
 #[serde(rename_all = "camelCase")]
 pub struct RoomSnapshot {
     pub room_code: String,
+    pub game_key: String,
+    pub game_options: serde_json::Value,
+    pub match_duration_secs: u64,
     pub players: Vec<PlayerSnapshot>,
     pub match_winner: Option<PlayerId>,
     pub match_remaining_ms: Option<u64>,
@@ -111,6 +114,9 @@ impl RoomState {
 
         RoomSnapshot {
             room_code: self.room_code.clone(),
+            game_key: self.game_key.clone(),
+            game_options: self.game_options.clone(),
+            match_duration_secs: self.match_duration_secs,
             players,
             match_winner: self.match_winner,
             match_remaining_ms,

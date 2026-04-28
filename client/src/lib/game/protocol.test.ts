@@ -27,6 +27,9 @@ describe('decodeServerMessage', () => {
 				type: 'roomState',
 				room: {
 					roomCode: 'ABCD',
+					gameKey: 'keyboarding',
+					gameOptions: null,
+					matchDurationSecs: 60,
 					players: [
 						{
 							id: 1,
@@ -55,6 +58,9 @@ describe('decodeServerMessage', () => {
 				type: 'roomState',
 				room: {
 					roomCode: 'ABCD',
+					gameKey: 'arithmetic',
+					gameOptions: { operation: 'addition' },
+					matchDurationSecs: 90,
 					players: [],
 					prompt: '',
 					roundId: 0,
@@ -74,6 +80,24 @@ describe('decodeServerMessage', () => {
 			})
 		);
 		expect(parsed?.type).toBe('roomState');
+	});
+
+	it('rejects roomState missing settings fields', () => {
+		// Missing gameKey/gameOptions/matchDurationSecs should be rejected.
+		const parsed = decodeServerMessage(
+			JSON.stringify({
+				type: 'roomState',
+				room: {
+					roomCode: 'ABCD',
+					players: [],
+					matchWinner: null,
+					matchRemainingMs: null,
+					hostPlayerId: 1,
+					activePowerups: []
+				}
+			})
+		);
+		expect(parsed).toBeNull();
 	});
 
 	it('parses promptState', () => {

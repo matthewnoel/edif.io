@@ -38,6 +38,14 @@ pub enum ClientMessage {
     },
     StartMatch,
     Rematch,
+    UpdateRoomSettings {
+        #[serde(rename = "gameMode")]
+        game_mode: Option<String>,
+        #[serde(rename = "matchDurationSecs")]
+        match_duration_secs: Option<u64>,
+        #[serde(rename = "gameOptions")]
+        game_options: Option<serde_json::Value>,
+    },
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -154,6 +162,12 @@ mod tests {
 
         let rematch = r#"{"type":"rematch"}"#;
         assert!(serde_json::from_str::<ClientMessage>(rematch).is_ok());
+
+        let update_settings = r#"{"type":"updateRoomSettings","gameMode":"arithmetic","matchDurationSecs":90,"gameOptions":{"operation":"addition"}}"#;
+        assert!(serde_json::from_str::<ClientMessage>(update_settings).is_ok());
+
+        let update_settings_partial = r#"{"type":"updateRoomSettings"}"#;
+        assert!(serde_json::from_str::<ClientMessage>(update_settings_partial).is_ok());
     }
 
     #[test]

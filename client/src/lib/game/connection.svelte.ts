@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import {
 	decodeServerMessage,
 	type ClientMessage,
+	type GameModeInfo,
 	type PowerUpKind,
 	type RoomSnapshot,
 	type ServerMessage
@@ -68,6 +69,7 @@ export const gs = $state({
 	room: null as RoomSnapshot | null,
 	roomCode: '',
 	gameKey: '',
+	gameModes: [] as GameModeInfo[],
 	inputPlaceholder: '',
 	inputMode: 'text' as 'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal',
 	promptInput: '',
@@ -115,6 +117,16 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		case 'roomState':
 			gs.room = message.room;
+			// When the host changes the game mode in the lobby, keep adapter-specific
+			// client state in sync so the input field is correct for the next match.
+			if (message.room.gameKey !== gs.gameKey) {
+				gs.gameKey = message.room.gameKey;
+				const mode = gs.gameModes.find((m) => m.key === message.room.gameKey);
+				if (mode) {
+					gs.inputPlaceholder = mode.inputPlaceholder;
+					gs.inputMode = mode.inputMode as typeof gs.inputMode;
+				}
+			}
 			if (message.room.matchWinner) {
 				gs.pendingPowerUps = [];
 				gs.powerUpToast = null;
@@ -316,4 +328,16 @@ export function rematch(): void {
 	gs.myPrompt = '';
 	gs.pendingPowerUps = [];
 	sendClientMessage({ type: 'rematch' });
+}
+
+export function updateRoomSettings(opts: {
+	gameMode?: string;
+	matchDurationSecs?: number;
+	gameOptions?: Record<string, string>;
+}): void {
+	sendClientMessage({ type: 'updateRoomSettings', ...opts });
+}
+
+export function setGameModes(modes: GameModeInfo[]): void {
+	gs.gameModes = modes;
 }

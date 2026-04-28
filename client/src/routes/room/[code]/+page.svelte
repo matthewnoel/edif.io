@@ -12,6 +12,8 @@
 		submitPrompt,
 		startMatch,
 		rematch,
+		updateRoomSettings,
+		setGameModes,
 		socketStateLabel,
 		defaultWsUrl,
 		loadSession,
@@ -19,11 +21,14 @@
 		disconnect
 	} from '$lib/game/connection.svelte';
 	import { nextBlobLayout, blobRadius, type BlobLayout } from '$lib/game/sim';
-	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
+	import type { GameModeInfo, PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import Button from '$lib/components/Button.svelte';
 	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
+	import Select from '$lib/components/Select.svelte';
+	import RangeInput from '$lib/components/RangeInput.svelte';
+	import Checkbox from '$lib/components/Checkbox.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 
 	type PowerUpMeta = {
@@ -78,6 +83,93 @@
 	let copyConfirmed = $state(false);
 	let copyTimeout = 0;
 	let powerUpToastTimeout = 0;
+
+	// --- Settings panel (lobby only) ---
+	let gameModes = $state<GameModeInfo[]>([]);
+	let settingsGameMode = $state('');
+	let settingsMatchDuration = $state('60');
+	let settingsGameOptions = $state<Record<string, string>>({});
+
+	const RANGE_PAIRS: [string, string][] = [
+		['firstTermMinimumDigits', 'firstTermMaximumDigits'],
+		['secondTermMinimumDigits', 'secondTermMaximumDigits']
+	];
+
+	let selectedMode = $derived(gameModes.find((m) => m.key === settingsGameMode));
+
+	let visibleOptions = $derived.by(() => {
+		if (!selectedMode?.options.length) return [];
+		return selectedMode.options.filter((opt) => {
+			if (!opt.visibleWhen) return true;
+			return settingsGameOptions[opt.visibleWhen.key] === opt.visibleWhen.value;
+		});
+	});
+
+	function initOptionDefaults(mode: GameModeInfo | undefined, currentOptions: Record<string, unknown> | null): void {
+		if (!mode || mode.options.length === 0) {
+			settingsGameOptions = {};
+			return;
+		}
+		const defaults: Record<string, string> = {};
+		for (const opt of mode.options) {
+			// Prefer existing server-side value, fall back to schema default.
+			const existing = currentOptions?.[opt.key];
+			defaults[opt.key] = existing != null ? String(existing) : String(opt.default);
+		}
+		settingsGameOptions = defaults;
+	}
+
+	function handleRangeChange(key: string, value: string): void {
+		settingsGameOptions = { ...settingsGameOptions, [key]: value };
+		for (const [minKey, maxKey] of RANGE_PAIRS) {
+			const min = parseInt(settingsGameOptions[minKey] ?? '1');
+			const max = parseInt(settingsGameOptions[maxKey] ?? '1');
+			if (key === minKey && min > max) {
+				settingsGameOptions = { ...settingsGameOptions, [maxKey]: value };
+			} else if (key === maxKey && max < min) {
+				settingsGameOptions = { ...settingsGameOptions, [minKey]: value };
+			}
+		}
+	}
+
+	function handleGameModeChange(newMode: string): void {
+		settingsGameMode = newMode;
+		const mode = gameModes.find((m) => m.key === newMode);
+		initOptionDefaults(mode, gs.room?.gameOptions ?? null);
+		const hasOptions = Object.keys(settingsGameOptions).length > 0;
+		updateRoomSettings({
+			gameMode: newMode,
+			gameOptions: hasOptions ? settingsGameOptions : undefined
+		});
+	}
+
+	function handleOptionChange(key: string, value: string): void {
+		settingsGameOptions = { ...settingsGameOptions, [key]: value };
+		updateRoomSettings({ gameOptions: settingsGameOptions });
+	}
+
+	function handleDurationChange(value: string): void {
+		settingsMatchDuration = value;
+		const parsed = parseInt(value);
+		if (parsed > 0) {
+			updateRoomSettings({ matchDurationSecs: parsed });
+		}
+	}
+
+	// Keep local settings state in sync with authoritative room state from server.
+	$effect(() => {
+		const room = gs.room;
+		if (!room) return;
+		if (settingsGameMode !== room.gameKey) {
+			settingsGameMode = room.gameKey;
+			const mode = gameModes.find((m) => m.key === room.gameKey);
+			initOptionDefaults(mode, room.gameOptions);
+		}
+		const serverDuration = String(room.matchDurationSecs);
+		if (settingsMatchDuration !== serverDuration) {
+			settingsMatchDuration = serverDuration;
+		}
+	});
 
 	let myActiveEffects = $derived([
 		...new Map(
@@ -259,7 +351,7 @@
 		copyTimeout = window.setTimeout(() => (copyConfirmed = false), 1500);
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		setOnDisconnect(() => goto(resolve('/')));
 
 		if (gs.phase !== 'ingame') {
@@ -271,6 +363,25 @@
 				gameMode: session?.gameMode,
 				rejoinToken: rejoinToken ?? undefined
 			});
+		}
+
+		// Fetch game modes so the host can change settings in the lobby.
+		try {
+			const res = await fetch('/api/game-modes');
+			if (res.ok) {
+				const modes: GameModeInfo[] = await res.json();
+				gameModes = modes;
+				setGameModes(modes);
+				// Initialise local settings from current room state.
+				if (gs.room) {
+					settingsGameMode = gs.room.gameKey;
+					const mode = modes.find((m) => m.key === gs.room!.gameKey);
+					initOptionDefaults(mode, gs.room.gameOptions);
+					settingsMatchDuration = String(gs.room.matchDurationSecs);
+				}
+			}
+		} catch {
+			/* server may not be running yet during dev */
 		}
 
 		animationHandle = requestAnimationFrame(animate);
@@ -295,10 +406,73 @@
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
 			<div class="lobby">
 				{#if gs.playerId === gs.room.hostPlayerId}
+					{#if gameModes.length > 0}
+						<div class="settings">
+							<label>
+								<strong>Game Mode:</strong>
+								<Select
+									value={settingsGameMode}
+									onchange={(e) => handleGameModeChange(e.currentTarget.value)}
+									options={gameModes.map((m) => ({ value: m.key, label: m.label }))}
+								/>
+							</label>
+							{#each visibleOptions as opt (opt.key)}
+								{#if opt.type === 'select'}
+									<label>
+										<strong>{opt.label}:</strong>
+										<Select
+											value={settingsGameOptions[opt.key] ?? String(opt.default)}
+											onchange={(e) => handleOptionChange(opt.key, e.currentTarget.value)}
+											options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
+										/>
+									</label>
+								{:else if opt.type === 'range'}
+									<label>
+										<strong>{opt.label} ({settingsGameOptions[opt.key] ?? opt.default}):</strong>
+										<RangeInput
+											min={opt.min}
+											max={opt.max}
+											step={opt.step}
+											value={settingsGameOptions[opt.key] ?? String(opt.default)}
+											oninput={(e) => {
+												handleRangeChange(opt.key, e.currentTarget.value);
+												updateRoomSettings({ gameOptions: settingsGameOptions });
+											}}
+										/>
+									</label>
+								{:else if opt.type === 'toggle'}
+									<label class="toggle">
+										<Checkbox
+											checked={settingsGameOptions[opt.key] === 'true'}
+											onchange={(e) =>
+												handleOptionChange(opt.key, String(e.currentTarget.checked))}
+										/>
+										<strong>{opt.label}</strong>
+									</label>
+								{/if}
+							{/each}
+							<label>
+								<strong>Match Duration (seconds):</strong>
+								<TextInput
+									value={settingsMatchDuration}
+									type="number"
+									min="5"
+									placeholder="60"
+									autocomplete="off"
+									oninput={(e) => handleDurationChange(e.currentTarget.value)}
+								/>
+							</label>
+						</div>
+					{/if}
 					<div class="lobby-start">
 						<Button label="Start Match" onclick={startMatch} />
 					</div>
 				{:else}
+					<div class="lobby-settings-readonly shizuru-regular">
+						{#if gs.room.gameKey}
+							<p>{gameModes.find((m) => m.key === gs.room!.gameKey)?.label ?? gs.room.gameKey} · {gs.room.matchDurationSecs}s</p>
+						{/if}
+					</div>
 					<div class="lobby-wait shizuru-regular">Waiting for host to start...</div>
 				{/if}
 			</div>
@@ -491,11 +665,42 @@
 
 	.lobby {
 		text-align: center;
-		margin-top: 6rem;
+		margin-top: 2rem;
 	}
 
 	.host {
 		padding-top: 6rem;
+	}
+
+	.settings {
+		display: grid;
+		gap: 0.6rem;
+		width: 100%;
+		max-width: 400px;
+		margin: 0 auto 1.25rem;
+		text-align: left;
+	}
+
+	.settings label {
+		display: grid;
+		gap: 0.2rem;
+		font-size: 0.9rem;
+	}
+
+	.settings label.toggle {
+		grid-template-columns: auto 1fr;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.lobby-settings-readonly {
+		font-size: 1rem;
+		color: #555;
+		margin-bottom: 0.5rem;
+	}
+
+	.lobby-settings-readonly p {
+		margin: 0;
 	}
 
 	.lobby-wait {

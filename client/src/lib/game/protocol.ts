@@ -26,6 +26,9 @@ export type PlayerSnapshot = {
 
 export type RoomSnapshot = {
 	roomCode: string;
+	gameKey: string;
+	gameOptions: Record<string, unknown> | null;
+	matchDurationSecs: number;
 	players: PlayerSnapshot[];
 	matchWinner: number | null;
 	matchRemainingMs: number | null;
@@ -74,6 +77,8 @@ export type GameModeInfo = {
 	key: string;
 	label: string;
 	options: OptionField[];
+	inputPlaceholder: string;
+	inputMode: string;
 };
 
 export type ClientMessage =
@@ -88,7 +93,13 @@ export type ClientMessage =
 	| { type: 'inputUpdate'; text: string }
 	| { type: 'submitAttempt'; text: string }
 	| { type: 'startMatch' }
-	| { type: 'rematch' };
+	| { type: 'rematch' }
+	| {
+			type: 'updateRoomSettings';
+			gameMode?: string;
+			matchDurationSecs?: number;
+			gameOptions?: Record<string, string>;
+	  };
 
 export type ServerMessage =
 	| {
@@ -183,6 +194,9 @@ function isRoomSnapshot(value: unknown): value is RoomSnapshot {
 	if (!isObject(value) || !Array.isArray(value.players)) return false;
 	return (
 		typeof value.roomCode === 'string' &&
+		typeof value.gameKey === 'string' &&
+		(value.gameOptions === null || isObject(value.gameOptions)) &&
+		typeof value.matchDurationSecs === 'number' &&
 		(value.matchWinner === null || typeof value.matchWinner === 'number') &&
 		(value.matchRemainingMs === null || typeof value.matchRemainingMs === 'number') &&
 		typeof value.hostPlayerId === 'number' &&
