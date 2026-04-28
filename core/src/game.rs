@@ -54,6 +54,11 @@ pub struct RoomSnapshot {
     pub match_remaining_ms: Option<u64>,
     pub host_player_id: PlayerId,
     pub active_powerups: Vec<ActivePowerUpSnapshot>,
+    pub game_key: String,
+    pub game_options: serde_json::Value,
+    pub match_duration_secs: u64,
+    pub input_mode: String,
+    pub input_placeholder: String,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +75,7 @@ pub struct RoomState {
     pub powerup_offers: Vec<PowerUpOffer>,
     pub active_powerups: Vec<ActivePowerUp>,
     pub next_offer_id: u64,
+    pub match_generation: u64,
 }
 
 impl RoomState {
@@ -79,6 +85,7 @@ impl RoomState {
         self.powerup_offers.clear();
         self.active_powerups.clear();
         self.next_offer_id = 0;
+        self.match_generation = self.match_generation.wrapping_add(1);
         for player in self.players.values_mut() {
             player.size = DEFAULT_START_SIZE;
             player.progress.clear();
@@ -116,6 +123,11 @@ impl RoomState {
             match_remaining_ms,
             host_player_id: self.host_player_id,
             active_powerups,
+            game_key: self.game_key.clone(),
+            game_options: self.game_options.clone(),
+            match_duration_secs: self.match_duration_secs,
+            input_mode: String::new(),
+            input_placeholder: String::new(),
         }
     }
 }
@@ -239,6 +251,7 @@ mod tests {
             powerup_offers: Vec::new(),
             active_powerups: Vec::new(),
             next_offer_id: 0,
+            match_generation: 0,
         }
     }
 
@@ -296,6 +309,7 @@ mod tests {
         room.players.get_mut(&1).unwrap().prompt = "old prompt".to_string();
         room.players.get_mut(&1).unwrap().prompt_id = 5;
         room.next_offer_id = 5;
+        room.match_generation = 7;
         room.powerup_offers.push(PowerUpOffer {
             offer_id: 4,
             kind: PowerUpKind::DoublePoints,
@@ -322,6 +336,7 @@ mod tests {
         assert!(room.players.get(&1).unwrap().progress.is_empty());
         assert!(room.players.get(&1).unwrap().prompt.is_empty());
         assert_eq!(room.players.get(&1).unwrap().prompt_id, 0);
+        assert_eq!(room.match_generation, 8);
     }
 
     #[test]

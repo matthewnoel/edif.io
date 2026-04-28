@@ -38,6 +38,14 @@ pub enum ClientMessage {
     },
     StartMatch,
     Rematch,
+    UpdateRoomSettings {
+        #[serde(rename = "gameMode")]
+        game_mode: Option<String>,
+        #[serde(rename = "matchDurationSecs")]
+        match_duration_secs: Option<u64>,
+        #[serde(rename = "gameOptions")]
+        game_options: Option<serde_json::Value>,
+    },
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -154,6 +162,12 @@ mod tests {
 
         let rematch = r#"{"type":"rematch"}"#;
         assert!(serde_json::from_str::<ClientMessage>(rematch).is_ok());
+
+        let update = r#"{"type":"updateRoomSettings","gameMode":"arithmetic","matchDurationSecs":90,"gameOptions":{"operation":"addition"}}"#;
+        assert!(serde_json::from_str::<ClientMessage>(update).is_ok());
+
+        let update_minimal = r#"{"type":"updateRoomSettings"}"#;
+        assert!(serde_json::from_str::<ClientMessage>(update_minimal).is_ok());
     }
 
     #[test]
@@ -322,6 +336,11 @@ mod tests {
                 remaining_ms: 20000,
                 duration_ms: 30000,
             }],
+            game_key: "keyboarding".to_string(),
+            game_options: json!({ "operation": "addition" }),
+            match_duration_secs: 60,
+            input_mode: "text".to_string(),
+            input_placeholder: "Type here...".to_string(),
         };
         let msg = ServerMessage::RoomState { room };
         assert_eq!(
@@ -347,6 +366,11 @@ mod tests {
                         "remainingMs": 20000,
                         "durationMs": 30000,
                     }],
+                    "gameKey": "keyboarding",
+                    "gameOptions": { "operation": "addition" },
+                    "matchDurationSecs": 60,
+                    "inputMode": "text",
+                    "inputPlaceholder": "Type here...",
                 },
             })
         );
@@ -604,9 +628,11 @@ mod tests {
             (r#"{"type":"submitAttempt","text":"a"}"#, true),
             (r#"{"type":"startMatch"}"#, true),
             (r#"{"type":"rematch"}"#, true),
+            (r#"{"type":"updateRoomSettings"}"#, true),
             // snake_case tags must NOT be accepted.
             (r#"{"type":"rejoin_room","rejoinToken":"t"}"#, false),
             (r#"{"type":"start_match"}"#, false),
+            (r#"{"type":"update_room_settings"}"#, false),
         ];
         for (raw, should_parse) in cases {
             let result = serde_json::from_str::<ClientMessage>(raw);

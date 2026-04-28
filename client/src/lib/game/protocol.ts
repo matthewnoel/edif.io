@@ -31,6 +31,11 @@ export type RoomSnapshot = {
 	matchRemainingMs: number | null;
 	hostPlayerId: number;
 	activePowerups: ActivePowerUpSnapshot[];
+	gameKey: string;
+	gameOptions: unknown;
+	matchDurationSecs: number;
+	inputMode: string;
+	inputPlaceholder: string;
 };
 
 export type SelectChoice = {
@@ -88,7 +93,13 @@ export type ClientMessage =
 	| { type: 'inputUpdate'; text: string }
 	| { type: 'submitAttempt'; text: string }
 	| { type: 'startMatch' }
-	| { type: 'rematch' };
+	| { type: 'rematch' }
+	| {
+			type: 'updateRoomSettings';
+			gameMode?: string;
+			matchDurationSecs?: number;
+			gameOptions?: Record<string, string>;
+	  };
 
 export type ServerMessage =
 	| {
@@ -188,7 +199,12 @@ function isRoomSnapshot(value: unknown): value is RoomSnapshot {
 		typeof value.hostPlayerId === 'number' &&
 		value.players.every(isPlayerSnapshot) &&
 		Array.isArray(value.activePowerups) &&
-		value.activePowerups.every(isActivePowerUpSnapshot)
+		value.activePowerups.every(isActivePowerUpSnapshot) &&
+		typeof value.gameKey === 'string' &&
+		'gameOptions' in value &&
+		typeof value.matchDurationSecs === 'number' &&
+		typeof value.inputMode === 'string' &&
+		typeof value.inputPlaceholder === 'string'
 	);
 }
 

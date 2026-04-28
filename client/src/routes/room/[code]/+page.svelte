@@ -25,6 +25,7 @@
 	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
+	import { LEAVE_ICON, SETTINGS_ICON } from '$lib/constants';
 
 	type PowerUpMeta = {
 		emoji: string;
@@ -252,6 +253,10 @@
 		goto(resolve('/'));
 	}
 
+	function editRoom(): void {
+		goto(resolve(`/room/${page.params.code}/edit`));
+	}
+
 	function copyRoomLink(): void {
 		navigator.clipboard.writeText(window.location.href);
 		clearTimeout(copyTimeout);
@@ -289,7 +294,10 @@
 		<RulesDialog />
 	{/if}
 	<div class="leave">
-		<Button label="Leave" onclick={leaveRoom} />
+		<Button label={LEAVE_ICON} onclick={leaveRoom} />
+		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
+			<Button label={SETTINGS_ICON} onclick={editRoom} />
+		{/if}
 	</div>
 	<header>
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
@@ -720,8 +728,16 @@
 		position: fixed;
 		top: 0.5rem;
 		left: 0.5rem;
-		right: 0.5rem;
 		z-index: 3;
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.leave :global(.btn) {
+		flex: 0 0 auto;
+		padding: 0.4rem 0.7rem;
+		font-size: 1.1rem;
+		line-height: 1;
 	}
 
 	.rematch-container,
