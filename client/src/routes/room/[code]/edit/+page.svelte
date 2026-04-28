@@ -71,7 +71,7 @@
 
 <main>
 	<div class="back">
-		<Button label="Back" onclick={backToRoom} />
+		<Button label="⬅" onclick={backToRoom} />
 	</div>
 	<div class="edit">
 		<h1 class="shizuru-regular">Edit Room</h1>
@@ -122,8 +122,16 @@
 		position: fixed;
 		top: 0.5rem;
 		left: 0.5rem;
-		right: 0.5rem;
 		z-index: 3;
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.back :global(.btn) {
+		flex: 0 0 auto;
+		padding: 0.4rem 0.7rem;
+		font-size: 1.1rem;
+		line-height: 1;
 	}
 
 	.error {

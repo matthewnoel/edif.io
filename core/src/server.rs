@@ -707,8 +707,8 @@ async fn handle_update_room_settings(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
 
-    if let Some(ref mode) = validated_game_mode
-        && !state.adapters.contains_key(mode) {
+    if let Some(ref mode) = validated_game_mode {
+        if !state.adapters.contains_key(mode) {
             let _ = send_server_message(
                 sender,
                 &ServerMessage::Error {
@@ -718,6 +718,7 @@ async fn handle_update_room_settings(
             );
             return;
         }
+    }
 
     {
         let mut rooms = state.rooms.lock().await;

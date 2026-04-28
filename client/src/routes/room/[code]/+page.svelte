@@ -293,9 +293,9 @@
 		<RulesDialog />
 	{/if}
 	<div class="leave">
-		<Button label="Leave" onclick={leaveRoom} />
+		<Button label="⬅" onclick={leaveRoom} />
 		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
-			<Button label="Edit Mode" onclick={editRoom} />
+			<Button label="⚙" onclick={editRoom} />
 		{/if}
 	</div>
 	<header>
@@ -727,10 +727,16 @@
 		position: fixed;
 		top: 0.5rem;
 		left: 0.5rem;
-		right: 0.5rem;
 		z-index: 3;
 		display: flex;
 		gap: 0.5rem;
+	}
+
+	.leave :global(.btn) {
+		flex: 0 0 auto;
+		padding: 0.4rem 0.7rem;
+		font-size: 1.1rem;
+		line-height: 1;
 	}
 
 	.rematch-container,
