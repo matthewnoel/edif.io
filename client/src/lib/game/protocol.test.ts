@@ -42,7 +42,12 @@ describe('decodeServerMessage', () => {
 					matchWinner: null,
 					matchRemainingMs: 45000,
 					hostPlayerId: 1,
-					activePowerups: []
+					activePowerups: [],
+					gameKey: 'keyboarding',
+					gameOptions: null,
+					matchDurationSecs: 60,
+					inputMode: 'text',
+					inputPlaceholder: 'Type here...'
 				}
 			})
 		);
@@ -69,7 +74,12 @@ describe('decodeServerMessage', () => {
 							durationMs: 15000
 						},
 						{ kind: 'doublePoints', sourcePlayerId: 3, remainingMs: 25000, durationMs: 30000 }
-					]
+					],
+					gameKey: 'arithmetic',
+					gameOptions: { operation: 'addition' },
+					matchDurationSecs: 90,
+					inputMode: 'decimal',
+					inputPlaceholder: ''
 				}
 			})
 		);

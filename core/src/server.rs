@@ -372,6 +372,24 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     handle_rematch(&state, code).await;
                 }
             }
+            ClientMessage::UpdateRoomSettings {
+                game_mode,
+                match_duration_secs,
+                game_options,
+            } => {
+                if let (Some(pid), Some(code)) = (player_id, room_code.as_ref()) {
+                    handle_update_room_settings(
+                        &state,
+                        code,
+                        pid,
+                        game_mode,
+                        match_duration_secs,
+                        game_options,
+                        &client_tx,
+                    )
+                    .await;
+                }
+            }
         }
     }
 
@@ -437,6 +455,7 @@ async fn join_or_create_room(
                     powerup_offers: Vec::new(),
                     active_powerups: Vec::new(),
                     next_offer_id: 0,
+                    match_generation: 0,
                 },
             );
             generated
@@ -649,15 +668,93 @@ async fn handle_start_match(state: &Arc<SharedState>, room_code: &str, player_id
         room.match_deadline = Some(deadline);
     }
 
-    start_match_timer(state.clone(), room_code.to_string(), duration_secs);
-    start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
+    let generation = {
+        let rooms = state.rooms.lock().await;
+        rooms
+            .get(room_code)
+            .map(|room| room.match_generation)
+            .unwrap_or(0)
+    };
+    start_match_timer(
+        state.clone(),
+        room_code.to_string(),
+        duration_secs,
+        generation,
+    );
+    start_powerup_timer(
+        state.clone(),
+        room_code.to_string(),
+        duration_secs,
+        generation,
+    );
 
     let _ = broadcast_room_state(state, room_code).await;
     ensure_prompts_for_all_players(state, room_code).await;
 }
 
+async fn handle_update_room_settings(
+    state: &Arc<SharedState>,
+    room_code: &str,
+    player_id: PlayerId,
+    requested_game_mode: Option<String>,
+    requested_match_duration_secs: Option<u64>,
+    requested_game_options: Option<serde_json::Value>,
+    sender: &mpsc::UnboundedSender<Message>,
+) {
+    let validated_game_mode = requested_game_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    if let Some(ref mode) = validated_game_mode {
+        if !state.adapters.contains_key(mode) {
+            let _ = send_server_message(
+                sender,
+                &ServerMessage::Error {
+                    message: format!("Game mode '{mode}' is not available"),
+                    code: Some(ErrorCode::InvalidGameMode),
+                },
+            );
+            return;
+        }
+    }
+
+    {
+        let mut rooms = state.rooms.lock().await;
+        let Some(room) = rooms.get_mut(room_code) else {
+            return;
+        };
+        if room.host_player_id != player_id {
+            let _ = send_server_message(
+                sender,
+                &ServerMessage::Error {
+                    message: "Only the host can change room settings".to_string(),
+                    code: None,
+                },
+            );
+            return;
+        }
+
+        if let Some(mode) = validated_game_mode {
+            room.game_key = mode;
+        }
+        if let Some(secs) = requested_match_duration_secs.filter(|&s| s > 0) {
+            room.match_duration_secs = secs;
+        }
+        if let Some(opts) = requested_game_options {
+            room.game_options = opts;
+        }
+
+        room.reset_for_rematch();
+    }
+
+    let _ = broadcast_room_state(state, room_code).await;
+}
+
 async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
     let duration_secs;
+    let generation;
     {
         let mut rooms = state.rooms.lock().await;
         let Some(room) = rooms.get_mut(room_code) else {
@@ -668,12 +765,23 @@ async fn handle_rematch(state: &Arc<SharedState>, room_code: &str) {
         }
         room.reset_for_rematch();
         duration_secs = room.match_duration_secs;
+        generation = room.match_generation;
         let deadline = Instant::now() + Duration::from_secs(duration_secs);
         room.match_deadline = Some(deadline);
     }
 
-    start_match_timer(state.clone(), room_code.to_string(), duration_secs);
-    start_powerup_timer(state.clone(), room_code.to_string(), duration_secs);
+    start_match_timer(
+        state.clone(),
+        room_code.to_string(),
+        duration_secs,
+        generation,
+    );
+    start_powerup_timer(
+        state.clone(),
+        room_code.to_string(),
+        duration_secs,
+        generation,
+    );
 
     let _ = broadcast_room_state(state, room_code).await;
     ensure_prompts_for_all_players(state, room_code).await;
@@ -778,7 +886,12 @@ async fn ensure_prompts_for_all_players(state: &Arc<SharedState>, room_code: &st
     }
 }
 
-fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: u64) {
+fn start_match_timer(
+    state: Arc<SharedState>,
+    room_code: String,
+    duration_secs: u64,
+    generation: u64,
+) {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(duration_secs)).await;
         {
@@ -786,13 +899,21 @@ fn start_match_timer(state: Arc<SharedState>, room_code: String, duration_secs: 
             let Some(room) = rooms.get_mut(&room_code) else {
                 return;
             };
+            if room.match_generation != generation {
+                return;
+            }
             resolve_match_by_timer(room);
         }
         let _ = broadcast_room_state(&state, &room_code).await;
     });
 }
 
-fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duration_secs: u64) {
+fn start_powerup_timer(
+    state: Arc<SharedState>,
+    room_code: String,
+    match_duration_secs: u64,
+    generation: u64,
+) {
     tokio::spawn(async move {
         let match_end = Instant::now() + Duration::from_secs(match_duration_secs);
         let mut next_interval = distribution_interval(2);
@@ -813,6 +934,9 @@ fn start_powerup_timer(state: Arc<SharedState>, room_code: String, match_duratio
                 let Some(room) = rooms.get_mut(&room_code) else {
                     break;
                 };
+                if room.match_generation != generation {
+                    break;
+                }
                 if room.match_winner.is_some() {
                     break;
                 }
@@ -936,13 +1060,18 @@ async fn send_to_player(
 }
 
 async fn broadcast_room_state(state: &Arc<SharedState>, room_code: &str) -> bool {
-    let snapshot = {
+    let mut snapshot = {
         let rooms = state.rooms.lock().await;
         let Some(room) = rooms.get(room_code) else {
             return false;
         };
         room.to_snapshot()
     };
+
+    if let Some(adapter) = state.adapters.get(&snapshot.game_key) {
+        snapshot.input_mode = adapter.input_mode().to_string();
+        snapshot.input_placeholder = adapter.input_placeholder().to_string();
+    }
 
     broadcast_to_room(
         state,
@@ -1315,5 +1444,167 @@ mod tests {
         assert_eq!(room.active_powerups.len(), 1, "one active power-up");
         assert_eq!(room.active_powerups[0].kind, PowerUpKind::DoublePoints);
         assert_eq!(room.active_powerups[0].source_player_id, pid);
+    }
+
+    #[tokio::test]
+    async fn host_can_update_room_settings() {
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (host_sender, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, host_pid) =
+            join_or_create_room(&state, None, Some("keyboarding".to_string()), None, None, sender)
+                .await
+                .expect("room created");
+
+        let initial_generation = {
+            let rooms = state.rooms.lock().await;
+            rooms.get(&room_code).expect("room exists").match_generation
+        };
+
+        handle_update_room_settings(
+            &state,
+            &room_code,
+            host_pid,
+            Some("arithmetic".to_string()),
+            Some(120),
+            Some(serde_json::json!({"operation": "addition"})),
+            &host_sender,
+        )
+        .await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room exists");
+        assert_eq!(room.game_key, "arithmetic");
+        assert_eq!(room.match_duration_secs, 120);
+        assert_eq!(
+            room.game_options,
+            serde_json::json!({"operation": "addition"})
+        );
+        assert!(room.match_deadline.is_none());
+        assert!(room.match_winner.is_none());
+        assert!(room.match_generation > initial_generation);
+    }
+
+    #[tokio::test]
+    async fn non_host_cannot_update_room_settings() {
+        let state = test_state();
+        let (host_sender, _) = mpsc::unbounded_channel::<Message>();
+        let (joiner_sender, _) = mpsc::unbounded_channel::<Message>();
+        let (joiner_reply, mut joiner_rx) = mpsc::unbounded_channel::<Message>();
+
+        let (room_code, _token, _host_pid) = join_or_create_room(
+            &state,
+            None,
+            Some("keyboarding".to_string()),
+            None,
+            None,
+            host_sender,
+        )
+        .await
+        .expect("room created");
+        let (_, _, joiner_pid) = join_or_create_room(
+            &state,
+            Some(room_code.clone()),
+            None,
+            None,
+            None,
+            joiner_sender,
+        )
+        .await
+        .expect("joined");
+
+        handle_update_room_settings(
+            &state,
+            &room_code,
+            joiner_pid,
+            Some("arithmetic".to_string()),
+            None,
+            None,
+            &joiner_reply,
+        )
+        .await;
+
+        let received = joiner_rx.try_recv().expect("error message sent");
+        let Message::Text(text) = received else {
+            panic!("expected text message");
+        };
+        assert!(text.contains("Only the host"));
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room exists");
+        assert_eq!(room.game_key, "keyboarding");
+    }
+
+    #[tokio::test]
+    async fn update_room_settings_rejects_unknown_game_mode() {
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (reply_tx, mut reply_rx) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, host_pid) =
+            join_or_create_room(&state, None, Some("keyboarding".to_string()), None, None, sender)
+                .await
+                .expect("room created");
+
+        handle_update_room_settings(
+            &state,
+            &room_code,
+            host_pid,
+            Some("does-not-exist".to_string()),
+            None,
+            None,
+            &reply_tx,
+        )
+        .await;
+
+        let received = reply_rx.try_recv().expect("error message sent");
+        let Message::Text(text) = received else {
+            panic!("expected text message");
+        };
+        assert!(text.contains("invalidGameMode"));
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room exists");
+        assert_eq!(room.game_key, "keyboarding");
+    }
+
+    #[tokio::test]
+    async fn update_room_settings_resets_in_progress_match_to_lobby() {
+        let state = test_state();
+        let (sender, _) = mpsc::unbounded_channel::<Message>();
+        let (host_sender, _) = mpsc::unbounded_channel::<Message>();
+        let (room_code, _token, host_pid) =
+            join_or_create_room(&state, None, Some("arithmetic".to_string()), None, None, sender)
+                .await
+                .expect("room created");
+
+        handle_start_match(&state, &room_code, host_pid).await;
+        let started_generation = {
+            let rooms = state.rooms.lock().await;
+            let room = rooms.get(&room_code).expect("room exists");
+            assert!(room.match_deadline.is_some());
+            room.match_generation
+        };
+
+        handle_update_room_settings(
+            &state,
+            &room_code,
+            host_pid,
+            Some("keyboarding".to_string()),
+            None,
+            None,
+            &host_sender,
+        )
+        .await;
+
+        let rooms = state.rooms.lock().await;
+        let room = rooms.get(&room_code).expect("room exists");
+        assert_eq!(room.game_key, "keyboarding");
+        assert!(room.match_deadline.is_none());
+        assert!(room.match_winner.is_none());
+        assert!(room.match_generation > started_generation);
+        for player in room.players.values() {
+            assert_eq!(player.size, DEFAULT_START_SIZE);
+            assert!(player.prompt.is_empty());
+        }
     }
 }

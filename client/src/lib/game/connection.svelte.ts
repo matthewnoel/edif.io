@@ -115,6 +115,9 @@ function handleServerMessage(message: ServerMessage): void {
 			break;
 		case 'roomState':
 			gs.room = message.room;
+			gs.gameKey = message.room.gameKey;
+			gs.inputMode = message.room.inputMode as typeof gs.inputMode;
+			gs.inputPlaceholder = message.room.inputPlaceholder;
 			if (message.room.matchWinner) {
 				gs.pendingPowerUps = [];
 				gs.powerUpToast = null;
@@ -316,4 +319,12 @@ export function rematch(): void {
 	gs.myPrompt = '';
 	gs.pendingPowerUps = [];
 	sendClientMessage({ type: 'rematch' });
+}
+
+export function updateRoomSettings(args: {
+	gameMode?: string;
+	matchDurationSecs?: number;
+	gameOptions?: Record<string, string>;
+}): void {
+	sendClientMessage({ type: 'updateRoomSettings', ...args });
 }

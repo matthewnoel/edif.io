@@ -66,7 +66,12 @@ describe('server → client wire contract', () => {
 						remainingMs: 20000,
 						durationMs: 30000
 					}
-				]
+				],
+				gameKey: 'keyboarding',
+				gameOptions: { operation: 'addition' },
+				matchDurationSecs: 60,
+				inputMode: 'text',
+				inputPlaceholder: 'Type here...'
 			}
 		});
 		expect(msg.type).toBe('roomState');
@@ -75,6 +80,10 @@ describe('server → client wire contract', () => {
 			expect(msg.room.activePowerups).toHaveLength(1);
 			expect(msg.room.activePowerups[0].kind).toBe('doublePoints');
 			expect(msg.room.matchRemainingMs).toBe(45000);
+			expect(msg.room.gameKey).toBe('keyboarding');
+			expect(msg.room.matchDurationSecs).toBe(60);
+			expect(msg.room.inputMode).toBe('text');
+			expect(msg.room.inputPlaceholder).toBe('Type here...');
 		}
 	});
 
@@ -229,7 +238,12 @@ describe('server → client wire contract rejects drift', () => {
 						matchWinner: null,
 						matchRemainingMs: null,
 						hostPlayerId: 1,
-						activePowerups: []
+						activePowerups: [],
+						gameKey: 'keyboarding',
+						gameOptions: null,
+						matchDurationSecs: 60,
+						inputMode: 'text',
+						inputPlaceholder: ''
 					}
 				})
 			)
@@ -247,7 +261,12 @@ describe('server → client wire contract rejects drift', () => {
 						match_winner: null,
 						match_remaining_ms: null,
 						host_player_id: 1,
-						active_powerups: []
+						active_powerups: [],
+						game_key: 'keyboarding',
+						game_options: null,
+						match_duration_secs: 60,
+						input_mode: 'text',
+						input_placeholder: ''
 					}
 				})
 			)

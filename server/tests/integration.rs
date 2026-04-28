@@ -545,3 +545,137 @@ async fn ws_arithmetic_room_uses_arithmetic_prompts() {
         "arithmetic addition prompt should contain '+': {prompt}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ws_host_can_update_room_settings() {
+    let server = start_server().await;
+
+    let mut host = connect_ws(server.addr).await;
+    send_json(
+        &mut host,
+        json!({
+            "type": "joinOrCreateRoom",
+            "gameMode": "keyboarding",
+            "matchDurationSecs": 30,
+        }),
+    )
+    .await;
+    let _ = recv_type(&mut host, "welcome").await;
+    let initial_state = recv_type(&mut host, "roomState").await;
+    let room = initial_state.get("room").expect("room obj");
+    assert_eq!(
+        room.get("gameKey").and_then(Value::as_str),
+        Some("keyboarding")
+    );
+    let room_code = room
+        .get("roomCode")
+        .and_then(Value::as_str)
+        .expect("roomCode")
+        .to_string();
+
+    let mut guest = connect_ws(server.addr).await;
+    send_json(
+        &mut guest,
+        json!({
+            "type": "joinOrCreateRoom",
+            "roomCode": room_code.clone(),
+        }),
+    )
+    .await;
+    let _ = recv_type(&mut guest, "welcome").await;
+    let _ = recv_type(&mut guest, "roomState").await;
+    let _ = recv_type(&mut host, "roomState").await;
+
+    send_json(
+        &mut host,
+        json!({
+            "type": "updateRoomSettings",
+            "gameMode": "arithmetic",
+            "matchDurationSecs": 90,
+            "gameOptions": { "operation": "addition" },
+        }),
+    )
+    .await;
+
+    let host_update = recv_type(&mut host, "roomState").await;
+    let updated_room = host_update.get("room").expect("room obj");
+    assert_eq!(
+        updated_room.get("gameKey").and_then(Value::as_str),
+        Some("arithmetic")
+    );
+    assert_eq!(
+        updated_room
+            .get("matchDurationSecs")
+            .and_then(Value::as_u64),
+        Some(90)
+    );
+    assert_eq!(
+        updated_room.get("inputMode").and_then(Value::as_str),
+        Some("decimal")
+    );
+    assert_eq!(
+        updated_room
+            .get("gameOptions")
+            .and_then(|v| v.get("operation"))
+            .and_then(Value::as_str),
+        Some("addition")
+    );
+
+    let guest_update = recv_type(&mut guest, "roomState").await;
+    let guest_room = guest_update.get("room").expect("room obj");
+    assert_eq!(
+        guest_room.get("gameKey").and_then(Value::as_str),
+        Some("arithmetic")
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ws_non_host_update_room_settings_is_rejected() {
+    let server = start_server().await;
+
+    let mut host = connect_ws(server.addr).await;
+    send_json(
+        &mut host,
+        json!({
+            "type": "joinOrCreateRoom",
+            "gameMode": "keyboarding",
+        }),
+    )
+    .await;
+    let _ = recv_type(&mut host, "welcome").await;
+    let host_state = recv_type(&mut host, "roomState").await;
+    let room_code = host_state
+        .get("room")
+        .and_then(|r| r.get("roomCode"))
+        .and_then(Value::as_str)
+        .expect("roomCode")
+        .to_string();
+
+    let mut guest = connect_ws(server.addr).await;
+    send_json(
+        &mut guest,
+        json!({
+            "type": "joinOrCreateRoom",
+            "roomCode": room_code,
+        }),
+    )
+    .await;
+    let _ = recv_type(&mut guest, "welcome").await;
+    let _ = recv_type(&mut guest, "roomState").await;
+
+    send_json(
+        &mut guest,
+        json!({
+            "type": "updateRoomSettings",
+            "gameMode": "arithmetic",
+        }),
+    )
+    .await;
+
+    let err = recv_type(&mut guest, "error").await;
+    let message = err.get("message").and_then(Value::as_str).unwrap_or("");
+    assert!(
+        message.to_lowercase().contains("host"),
+        "expected host-only error message, got: {message}"
+    );
+}

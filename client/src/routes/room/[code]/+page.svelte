@@ -252,6 +252,10 @@
 		goto(resolve('/'));
 	}
 
+	function editRoom(): void {
+		goto(resolve(`/room/${page.params.code}/edit`));
+	}
+
 	function copyRoomLink(): void {
 		navigator.clipboard.writeText(window.location.href);
 		clearTimeout(copyTimeout);
@@ -290,6 +294,9 @@
 	{/if}
 	<div class="leave">
 		<Button label="Leave" onclick={leaveRoom} />
+		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
+			<Button label="Edit Mode" onclick={editRoom} />
+		{/if}
 	</div>
 	<header>
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
@@ -722,6 +729,8 @@
 		left: 0.5rem;
 		right: 0.5rem;
 		z-index: 3;
+		display: flex;
+		gap: 0.5rem;
 	}
 
 	.rematch-container,
