@@ -708,16 +708,17 @@ async fn handle_update_room_settings(
         .map(|s| s.to_string());
 
     if let Some(ref mode) = validated_game_mode
-        && !state.adapters.contains_key(mode) {
-            let _ = send_server_message(
-                sender,
-                &ServerMessage::Error {
-                    message: format!("Game mode '{mode}' is not available"),
-                    code: Some(ErrorCode::InvalidGameMode),
-                },
-            );
-            return;
-        }
+        && !state.adapters.contains_key(mode)
+    {
+        let _ = send_server_message(
+            sender,
+            &ServerMessage::Error {
+                message: format!("Game mode '{mode}' is not available"),
+                code: Some(ErrorCode::InvalidGameMode),
+            },
+        );
+        return;
+    }
 
     {
         let mut rooms = state.rooms.lock().await;
