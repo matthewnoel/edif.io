@@ -25,6 +25,7 @@
 	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
+	import { LEAVE_ICON, SETTINGS_ICON } from '$lib/constants';
 
 	type PowerUpMeta = {
 		emoji: string;
@@ -293,9 +294,9 @@
 		<RulesDialog />
 	{/if}
 	<div class="leave">
-		<Button label="⬅" onclick={leaveRoom} />
+		<Button label={SETTINGS_ICON} onclick={leaveRoom} />
 		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
-			<Button label="⚙" onclick={editRoom} />
+			<Button label={SETTINGS_ICON} onclick={editRoom} />
 		{/if}
 	</div>
 	<header>

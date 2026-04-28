@@ -7,6 +7,7 @@
 	import type { GameModeInfo } from '$lib/game/protocol';
 	import Button from '$lib/components/Button.svelte';
 	import GameSetupForm from '$lib/components/GameSetupForm.svelte';
+	import { SETTINGS_ICON } from '$lib/constants';
 
 	let gameModes = $state<GameModeInfo[]>([]);
 	let selectedGameMode = $state('');
@@ -71,7 +72,7 @@
 
 <main>
 	<div class="back">
-		<Button label="⬅" onclick={backToRoom} />
+		<Button label={SETTINGS_ICON} onclick={backToRoom} />
 	</div>
 	<div class="edit">
 		<h1 class="shizuru-regular">Edit Room</h1>
