@@ -294,7 +294,7 @@
 		<RulesDialog />
 	{/if}
 	<div class="leave">
-		<Button label={SETTINGS_ICON} onclick={leaveRoom} />
+		<Button label={LEAVE_ICON} onclick={leaveRoom} />
 		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
 			<Button label={SETTINGS_ICON} onclick={editRoom} />
 		{/if}
