@@ -12,6 +12,7 @@ on:
       - "server/**"
       - "client/**"
       - "scripts/**"
+      - "data/**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -49,8 +50,10 @@ jobs:
               - 'core/**'
               - 'adapters/**'
               - 'server/**'
+              - 'data/**'
             web:
               - 'client/**'
+              - 'data/**'
 
   autofix:
     name: Auto-fix
@@ -102,6 +105,9 @@ jobs:
 
       - name: Regenerate AGENTS.md files
         run: bash scripts/generate-agents-md.sh
+
+      - name: Regenerate customization files
+        run: bash scripts/generate-customization.sh
 
       - name: Commit automated fixes
         uses: stefanzweifel/git-auto-commit-action@v7
