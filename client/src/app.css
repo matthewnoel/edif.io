@@ -27,3 +27,11 @@ button {
 	font-weight: 400;
 	font-style: normal;
 }
+
+.wide-button {
+	margin: 0 auto;
+	width: 100%;
+	max-width: 25rem;
+	display: flex;
+	padding: 1rem 0 2rem 0;
+}
