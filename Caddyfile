@@ -1,5 +1,14 @@
 :8080 {
-	reverse_proxy /ws localhost:4000
-	reverse_proxy /api/* localhost:4000
-	reverse_proxy localhost:3000
+	reverse_proxy /ws localhost:4000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+	reverse_proxy /api/* localhost:4000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+	reverse_proxy localhost:3000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }
