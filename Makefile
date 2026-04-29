@@ -25,3 +25,4 @@ build:
 
 generate:
 	bash scripts/generate-agents-md.sh
+	bash scripts/generate-customization.sh

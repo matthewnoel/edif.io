@@ -88,6 +88,8 @@ export type ClientMessage =
 			gameMode?: string;
 			matchDurationSecs?: number;
 			gameOptions?: Record<string, string>;
+			playerName?: string;
+			playerColor?: string;
 	  }
 	| { type: 'rejoinRoom'; rejoinToken: string }
 	| { type: 'inputUpdate'; text: string }

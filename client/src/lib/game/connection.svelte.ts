@@ -214,6 +214,8 @@ export function connect(
 		matchDurationSecs?: number;
 		gameOptions?: Record<string, string>;
 		rejoinToken?: string;
+		playerName?: string;
+		playerColor?: string;
 	}
 ): void {
 	if (gs.phase === 'connecting') return;
@@ -250,7 +252,9 @@ export function connect(
 				roomCode: opts?.roomCode ? normalizeRoomCode(opts.roomCode) : undefined,
 				gameMode: opts?.gameMode || undefined,
 				matchDurationSecs: opts?.matchDurationSecs,
-				gameOptions: hasOptions ? opts!.gameOptions : undefined
+				gameOptions: hasOptions ? opts!.gameOptions : undefined,
+				playerName: opts?.playerName || undefined,
+				playerColor: opts?.playerColor || undefined
 			});
 		}
 	};
