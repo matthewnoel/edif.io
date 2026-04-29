@@ -303,7 +303,7 @@
 		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
 			<div class="lobby">
 				{#if gs.playerId === gs.room.hostPlayerId}
-					<div class="lobby-start">
+					<div class="wide-button">
 						<Button label="Start Match" onclick={startMatch} />
 					</div>
 				{:else}
@@ -324,11 +324,19 @@
 				<div class="prompt">
 					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>
 				</div>
+				<div class="wide-button">
+					<Button
+						label="Refresh"
+						onclick={() => {
+							window.location.reload();
+						}}
+					/>
+				</div>
 			{/if}
 			{#if gs.room?.matchWinner}
 				<div class="game-over-container">
 					<h1 class="shizuru-regular">Game Over</h1>
-					<div class="rematch-container">
+					<div class="wide-button">
 						<Button label="Rematch" onclick={rematch} />
 					</div>
 				</div>
@@ -738,19 +746,6 @@
 		padding: 0.4rem 0.7rem;
 		font-size: 1.1rem;
 		line-height: 1;
-	}
-
-	.rematch-container,
-	.lobby-start {
-		display: flex;
-		justify-content: center;
-		width: 100%;
-		max-width: 25rem;
-		padding: 1rem 0 2rem 0;
-	}
-
-	.lobby-start {
-		margin: 0 auto;
 	}
 
 	.room {
