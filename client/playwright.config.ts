@@ -14,8 +14,12 @@ const isCi = !!process.env.CI;
  */
 export default defineConfig({
 	testDir: 'e2e',
+	reporter: isCi ? [['html', { open: 'never' }], ['list']] : 'list',
 	use: {
-		baseURL: 'http://localhost:4173'
+		baseURL: 'http://localhost:4173',
+		trace: 'retain-on-failure',
+		screenshot: 'only-on-failure',
+		video: 'retain-on-failure'
 	},
 	webServer: [
 		{
