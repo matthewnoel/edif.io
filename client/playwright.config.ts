@@ -1,6 +1,40 @@
 import { defineConfig } from '@playwright/test';
 
+const isCi = !!process.env.CI;
+
+/**
+ * Three web servers run in parallel:
+ *  - `vite preview` on 4173: serves the production build for the
+ *    home-page dependency-graph smoke tests in `home.test.ts`.
+ *  - `cargo run -p server` on 4000: the real Rust server, providing
+ *    `/api/game-modes`, `/healthz`, and the `/ws` WebSocket upgrade.
+ *  - `vite dev` on 5173: proxies `/ws` and `/api` to the Rust server
+ *    (see `vite.config.ts`) so a real browser can play through a full
+ *    round in `full-stack.test.ts`.
+ */
 export default defineConfig({
-	webServer: { command: 'npm run build && npm run preview', port: 4173 },
-	testDir: 'e2e'
+	testDir: 'e2e',
+	use: {
+		baseURL: 'http://localhost:4173'
+	},
+	webServer: [
+		{
+			command: 'npm run build && npm run preview',
+			port: 4173,
+			reuseExistingServer: !isCi
+		},
+		{
+			command: 'cargo run -p server',
+			cwd: '..',
+			url: 'http://127.0.0.1:4000/healthz',
+			reuseExistingServer: !isCi,
+			timeout: 240_000
+		},
+		{
+			command: 'npm run dev -- --port 5173 --strictPort',
+			url: 'http://localhost:5173',
+			reuseExistingServer: !isCi,
+			timeout: 60_000
+		}
+	]
 });

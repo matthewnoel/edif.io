@@ -91,13 +91,28 @@ jobs:
     name: Validate (web)
     runs-on: ubuntu-latest
     needs: [changes]
-    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.workflow == 'true'
+    # Also run on Rust changes: the Playwright suite includes a full-stack
+    # test that drives a real browser through the Rust WebSocket server,
+    # so axum/tokio/tokio-tungstenite bumps need to gate on it.
+    if: >-
+      needs.changes.outputs.web == 'true'
+      || needs.changes.outputs.rust == 'true'
+      || needs.changes.outputs.workflow == 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Pre-build server binary
+        run: cargo build -p server
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
