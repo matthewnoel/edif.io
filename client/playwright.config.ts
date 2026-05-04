@@ -5,7 +5,11 @@ const isCi = !!process.env.CI;
 /**
  * Three web servers run in parallel:
  *  - `vite preview` on 4173: serves the production build for the
- *    home-page dependency-graph smoke tests in `home.test.ts`.
+ *    home-page dependency-graph smoke tests in `home.test.ts`. The
+ *    build itself is *not* part of this command — see the `pretest:e2e`
+ *    npm script and CI's "Build client" step. Doing the build here as
+ *    `npm run build && ...` races with `vite dev`'s svelte-kit sync
+ *    (both touch `.svelte-kit/`).
  *  - `cargo run -p server` on 4000: the real Rust server, providing
  *    `/api/game-modes`, `/healthz`, and the `/ws` WebSocket upgrade.
  *  - `vite dev` on 5173: proxies `/ws` and `/api` to the Rust server
@@ -23,9 +27,10 @@ export default defineConfig({
 	},
 	webServer: [
 		{
-			command: 'npm run build && npm run preview',
+			command: 'npm run preview',
 			port: 4173,
-			reuseExistingServer: !isCi
+			reuseExistingServer: !isCi,
+			timeout: 60_000
 		},
 		{
 			command: 'cargo run -p server',
