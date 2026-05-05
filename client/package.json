@@ -15,6 +15,7 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test",
+		"test:e2e:fullstack": "playwright test --config=playwright.fullstack.config.ts",
 		"generate:favicon": "curl -sL https://raw.githubusercontent.com/matthewnoel/emoji-favicon-generator/main/generate-favicon.mjs -o .generate-favicon.tmp.mjs && node .generate-favicon.tmp.mjs 🧠; rm -f .generate-favicon.tmp.mjs"
 	},
 	"devDependencies": {
