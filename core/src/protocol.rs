@@ -25,6 +25,10 @@ pub enum ClientMessage {
         match_duration_secs: Option<u64>,
         #[serde(rename = "gameOptions")]
         game_options: Option<serde_json::Value>,
+        #[serde(rename = "playerName", default)]
+        player_name: Option<String>,
+        #[serde(rename = "playerColor", default)]
+        player_color: Option<String>,
     },
     RejoinRoom {
         #[serde(rename = "rejoinToken")]
@@ -593,6 +597,8 @@ mod tests {
             "gameMode": "keyboarding",
             "matchDurationSecs": 90,
             "gameOptions": { "operation": "addition" },
+            "playerName": "Brave Panda",
+            "playerColor": "#38bdf8",
         })
         .to_string();
         let parsed: ClientMessage = serde_json::from_str(&raw).expect("parse");
@@ -601,6 +607,8 @@ mod tests {
             game_mode,
             match_duration_secs,
             game_options,
+            player_name,
+            player_color,
         } = parsed
         else {
             panic!("expected JoinOrCreateRoom");
@@ -609,6 +617,8 @@ mod tests {
         assert_eq!(game_mode.as_deref(), Some("keyboarding"));
         assert_eq!(match_duration_secs, Some(90));
         assert_eq!(game_options, Some(json!({ "operation": "addition" })));
+        assert_eq!(player_name.as_deref(), Some("Brave Panda"));
+        assert_eq!(player_color.as_deref(), Some("#38bdf8"));
     }
 
     #[test]

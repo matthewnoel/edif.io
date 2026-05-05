@@ -1,4 +1,5 @@
 use crate::adapter::{AdapterHandle, AdapterRegistry, OptionField, build_adapter_registry};
+use crate::customization::{ADJECTIVES, NOUNS, PALETTE};
 use crate::game::{
     DEFAULT_START_SIZE, PlayerId, PlayerState, RoomState, apply_round_win,
     apply_wrong_answer_penalty, deduct_from_top_players, find_top_player_ids,
@@ -178,6 +179,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                 game_mode,
                 match_duration_secs,
                 game_options,
+                player_name,
+                player_color,
             } => {
                 if player_id.is_some() {
                     continue;
@@ -189,6 +192,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<SharedState>) {
                     game_mode,
                     match_duration_secs,
                     game_options,
+                    player_name,
+                    player_color,
                     client_tx.clone(),
                 )
                 .await;
@@ -406,12 +411,15 @@ enum JoinError {
     InvalidGameMode(String),
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn join_or_create_room(
     state: &Arc<SharedState>,
     requested_room_code: Option<String>,
     requested_game_mode: Option<String>,
     requested_match_duration_secs: Option<u64>,
     requested_game_options: Option<serde_json::Value>,
+    requested_player_name: Option<String>,
+    requested_player_color: Option<String>,
     sender: mpsc::UnboundedSender<Message>,
 ) -> Result<(String, String, PlayerId), JoinError> {
     let token = generate_rejoin_token();
@@ -473,9 +481,13 @@ async fn join_or_create_room(
         player_id,
         PlayerState {
             id: player_id,
-            name: generate_player_name(&mut rand::rng()),
+            name: requested_player_name
+                .filter(|n| validate_player_name(n))
+                .unwrap_or_else(|| generate_player_name(&mut rand::rng())),
             size: DEFAULT_START_SIZE,
-            color: generate_color(player_id),
+            color: requested_player_color
+                .filter(|c| validate_player_color(c))
+                .unwrap_or_else(|| generate_color(player_id)),
             connected: true,
             progress: String::new(),
             rejoin_token: token.clone(),
@@ -1138,33 +1150,25 @@ fn generate_room_code(rooms: &HashMap<String, RoomState>) -> String {
 }
 
 fn generate_player_name(rng: &mut impl Rng) -> String {
-    const ADJECTIVES: &[&str] = &[
-        "Brave", "Clever", "Cosmic", "Daring", "Dizzy", "Eager", "Fancy", "Fizzy", "Fluffy",
-        "Funky", "Gentle", "Giddy", "Glossy", "Golden", "Happy", "Hasty", "Jazzy", "Jolly",
-        "Lucky", "Mega", "Mighty", "Misty", "Nifty", "Noble", "Peppy", "Plucky", "Polar", "Quick",
-        "Rapid", "Rocky", "Royal", "Rusty", "Sandy", "Shiny", "Silly", "Sleek", "Snappy", "Solar",
-        "Speedy", "Spicy", "Super", "Swift", "Tiny", "Turbo", "Vivid", "Wacky", "Wild", "Witty",
-        "Zappy", "Zippy",
-    ];
-    const NOUNS: &[&str] = &[
-        "Badger", "Banana", "Beetle", "Bison", "Bobcat", "Bunny", "Cactus", "Cloud", "Comet",
-        "Cookie", "Corgi", "Dingo", "Dragon", "Eagle", "Falcon", "Ferret", "Fox", "Gecko",
-        "Gopher", "Hippo", "Igloo", "Jackal", "Koala", "Lemon", "Llama", "Mango", "Moose",
-        "Narwhal", "Newt", "Otter", "Owl", "Panda", "Parrot", "Peach", "Penguin", "Pickle",
-        "Puffin", "Quokka", "Raven", "Rocket", "Sloth", "Squid", "Taco", "Tiger", "Toucan",
-        "Turtle", "Waffle", "Walrus", "Yeti", "Zebra",
-    ];
     let adj = ADJECTIVES[rng.random_range(0..ADJECTIVES.len())];
     let noun = NOUNS[rng.random_range(0..NOUNS.len())];
     format!("{adj} {noun}")
 }
 
 fn generate_color(player_id: PlayerId) -> String {
-    let palette = [
-        "#38bdf8", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#fb7185", "#22d3ee",
-    ];
-    let idx = (player_id as usize) % palette.len();
-    palette[idx].to_string()
+    PALETTE[(player_id as usize) % PALETTE.len()].to_string()
+}
+
+fn validate_player_name(name: &str) -> bool {
+    let mut parts = name.splitn(2, ' ');
+    let (Some(adj), Some(noun)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    ADJECTIVES.contains(&adj) && NOUNS.contains(&noun)
+}
+
+fn validate_player_color(color: &str) -> bool {
+    PALETTE.contains(&color)
 }
 
 #[cfg(test)]
@@ -1239,6 +1243,8 @@ mod tests {
             Some("arithmetic".to_string()),
             None,
             None,
+            None,
+            None,
             sender,
         )
         .await
@@ -1258,6 +1264,8 @@ mod tests {
             &state,
             None,
             Some("unknown-mode".to_string()),
+            None,
+            None,
             None,
             None,
             sender,
@@ -1280,6 +1288,8 @@ mod tests {
             Some("keyboarding".to_string()),
             None,
             None,
+            None,
+            None,
             sender_1,
         )
         .await
@@ -1289,6 +1299,8 @@ mod tests {
             &state,
             Some(room_code.clone()),
             Some("arithmetic".to_string()),
+            None,
+            None,
             None,
             None,
             sender_2,
@@ -1311,6 +1323,8 @@ mod tests {
             &state,
             None,
             Some("arithmetic".to_string()),
+            None,
+            None,
             None,
             None,
             sender,
@@ -1361,6 +1375,8 @@ mod tests {
             Some("arithmetic".to_string()),
             None,
             None,
+            None,
+            None,
             sender,
         )
         .await
@@ -1408,9 +1424,10 @@ mod tests {
 
         let state = test_state();
         let (sender, _) = mpsc::unbounded_channel::<Message>();
-        let (room_code, _token, pid) = join_or_create_room(&state, None, None, None, None, sender)
-            .await
-            .expect("room created");
+        let (room_code, _token, pid) =
+            join_or_create_room(&state, None, None, None, None, None, None, sender)
+                .await
+                .expect("room created");
 
         handle_start_match(&state, &room_code, pid).await;
 
@@ -1455,6 +1472,8 @@ mod tests {
             &state,
             None,
             Some("keyboarding".to_string()),
+            None,
+            None,
             None,
             None,
             sender,
@@ -1504,6 +1523,8 @@ mod tests {
             Some("keyboarding".to_string()),
             None,
             None,
+            None,
+            None,
             host_sender,
         )
         .await
@@ -1511,6 +1532,8 @@ mod tests {
         let (_, _, joiner_pid) = join_or_create_room(
             &state,
             Some(room_code.clone()),
+            None,
+            None,
             None,
             None,
             None,
@@ -1552,6 +1575,8 @@ mod tests {
             Some("keyboarding".to_string()),
             None,
             None,
+            None,
+            None,
             sender,
         )
         .await
@@ -1590,6 +1615,8 @@ mod tests {
             Some("arithmetic".to_string()),
             None,
             None,
+            None,
+            None,
             sender,
         )
         .await
@@ -1623,6 +1650,286 @@ mod tests {
         for player in room.players.values() {
             assert_eq!(player.size, DEFAULT_START_SIZE);
             assert!(player.prompt.is_empty());
+        }
+    }
+
+    #[test]
+    fn validate_player_name_accepts_predefined_pairs() {
+        assert!(validate_player_name("Brave Panda"));
+        assert!(validate_player_name("Zippy Zebra"));
+        assert!(validate_player_name("Gentle Otter"));
+    }
+
+    #[test]
+    fn validate_player_color_accepts_palette() {
+        for color in PALETTE {
+            assert!(validate_player_color(color));
+        }
+    }
+
+    /// Coverage for the adversarial scenario from the feature spec: a malicious
+    /// client crafts a `JoinOrCreateRoom` payload containing a hand-picked name
+    /// or color that isn't in the predefined sets. The server must silently
+    /// fall back to the generated default — never honor the spoofed value, and
+    /// never error out (so the attack is indistinguishable from a normal join
+    /// where the user didn't pick anything).
+    ///
+    /// Two layers of assertions for every malicious input:
+    ///   1. `validate_player_*` rejects it.
+    ///   2. `join_or_create_room` produces a `PlayerState` whose name/color
+    ///      passes the validator and is not the spoofed value.
+    ///
+    /// The second layer is what really matters — (1) could be correct while
+    /// (2) is broken if the wiring around the validator regresses.
+    mod adversarial {
+        use super::*;
+
+        // Each tuple: (malicious input, scenario label used in failure messages).
+        const ADVERSARIAL_NAMES: &[(&str, &str)] = &[
+            // Free-text names not in the predefined sets.
+            ("L33T H4XOR", "leet-speak free-text"),
+            ("Sneaky Hacker", "free-text words not in either set"),
+            ("My Custom Name", "arbitrary free-text"),
+            ("Admin Mod", "social-engineering name"),
+            // Wrong shape — not exactly two space-separated words.
+            ("Brave", "single word, missing noun"),
+            ("Panda", "single word, just noun"),
+            ("", "empty string"),
+            (" ", "single space"),
+            ("  ", "two spaces only"),
+            ("Brave Panda Extra", "three words"),
+            ("Brave Panda Extra Word", "four words"),
+            // Case mutations — the predefined sets are case-sensitive.
+            ("brave panda", "all lowercase"),
+            ("BRAVE PANDA", "all uppercase"),
+            ("Brave PANDA", "noun all uppercase"),
+            ("brave Panda", "adjective lowercase"),
+            ("BraVe PaNda", "alternating case"),
+            // Whitespace tricks around or between the words.
+            (" Brave Panda", "leading space"),
+            ("Brave Panda ", "trailing space"),
+            ("Brave  Panda", "two spaces between"),
+            ("\tBrave Panda", "leading tab"),
+            ("Brave Panda\n", "trailing newline"),
+            ("Brave\tPanda", "tab as separator"),
+            (
+                "Brave\u{00a0}Panda",
+                "non-breaking space (U+00A0) as separator",
+            ),
+            // Cross-set: real words used in the wrong slot.
+            ("Panda Brave", "noun-then-adjective swap"),
+            ("Brave Brave", "adjective in noun slot"),
+            ("Panda Panda", "noun in adjective slot"),
+            // Near-misses (one character off a real word).
+            ("Bravex Panda", "adjective with extra trailing letter"),
+            ("Brave Pandaa", "noun with extra trailing letter"),
+            ("Brav Panda", "adjective truncated"),
+            ("Brave Pand", "noun truncated"),
+            // Homoglyph attacks — Cyrillic 'а' (U+0430) mimicking Latin 'a'.
+            ("Br\u{0430}ve Panda", "Cyrillic homoglyph in adjective"),
+            ("Brave Pand\u{0430}", "Cyrillic homoglyph in noun"),
+            // Punctuation / symbols instead of a space separator.
+            ("Brave-Panda", "hyphen separator"),
+            ("Brave_Panda", "underscore separator"),
+            ("Brave.Panda", "period separator"),
+            ("Brave/Panda", "slash separator"),
+            // Plausibly hostile string-length / control content.
+            ("Brave\0Panda", "NUL byte separator"),
+            ("Brave\nPanda", "newline separator"),
+        ];
+
+        const ADVERSARIAL_COLORS: &[(&str, &str)] = &[
+            // Hex outside the palette.
+            ("#000000", "black"),
+            ("#ffffff", "white"),
+            ("#ff0000", "red, outside palette"),
+            ("#123456", "arbitrary hex"),
+            // Case mutations — palette values are lowercase only.
+            ("#38BDF8", "uppercase hex of a palette color"),
+            ("#38Bdf8", "mixed-case hex of a palette color"),
+            // Wrong format.
+            ("38bdf8", "missing # prefix"),
+            ("rgb(56, 189, 248)", "rgb() form"),
+            ("rgba(56, 189, 248, 1)", "rgba() form"),
+            ("hsl(199, 92%, 60%)", "hsl() form"),
+            ("transparent", "named CSS keyword"),
+            ("red", "named CSS keyword"),
+            // Wrong length.
+            ("#38bdf8aa", "palette hex with alpha appended"),
+            ("#38bdf80", "palette hex with extra trailing char"),
+            ("#38bd", "truncated hex"),
+            ("#3", "single-char hex"),
+            // Empty / whitespace.
+            ("", "empty string"),
+            (" ", "single space"),
+            ("#38bdf8 ", "palette hex with trailing space"),
+            (" #38bdf8", "palette hex with leading space"),
+            ("\t#38bdf8", "palette hex with leading tab"),
+        ];
+
+        // ----- Validator-level (pure) -----
+
+        #[test]
+        fn validator_rejects_every_adversarial_name() {
+            for (input, scenario) in ADVERSARIAL_NAMES {
+                assert!(
+                    !validate_player_name(input),
+                    "validator accepted adversarial name {input:?} ({scenario})",
+                );
+            }
+        }
+
+        #[test]
+        fn validator_rejects_every_adversarial_color() {
+            for (input, scenario) in ADVERSARIAL_COLORS {
+                assert!(
+                    !validate_player_color(input),
+                    "validator accepted adversarial color {input:?} ({scenario})",
+                );
+            }
+        }
+
+        // ----- End-to-end via join_or_create_room -----
+
+        /// Joins a fresh room with the given (optional) requested name/color
+        /// and returns the resulting player's stored name and color. This is
+        /// what the client would observe after a `welcome` + `roomState`
+        /// exchange — i.e. the values the server actually committed.
+        async fn join_with(
+            state: &Arc<SharedState>,
+            requested_name: Option<&str>,
+            requested_color: Option<&str>,
+        ) -> (String, String) {
+            let (sender, _) = mpsc::unbounded_channel::<Message>();
+            let (room_code, _, pid) = join_or_create_room(
+                state,
+                None,
+                None,
+                None,
+                None,
+                requested_name.map(str::to_string),
+                requested_color.map(str::to_string),
+                sender,
+            )
+            .await
+            .expect("room created");
+            let rooms = state.rooms.lock().await;
+            let player = rooms
+                .get(&room_code)
+                .expect("room exists")
+                .players
+                .get(&pid)
+                .expect("player exists");
+            (player.name.clone(), player.color.clone())
+        }
+
+        #[tokio::test]
+        async fn join_with_adversarial_name_falls_back_to_generated() {
+            let state = test_state();
+            for (input, scenario) in ADVERSARIAL_NAMES {
+                let (name, _) = join_with(&state, Some(input), None).await;
+                assert_ne!(
+                    name, *input,
+                    "server honored adversarial name {input:?} ({scenario})",
+                );
+                assert!(
+                    validate_player_name(&name),
+                    "fallback name {name:?} for adversarial input {input:?} \
+                     ({scenario}) does not pass validator",
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn join_with_adversarial_color_falls_back_to_generated() {
+            let state = test_state();
+            for (input, scenario) in ADVERSARIAL_COLORS {
+                let (_, color) = join_with(&state, None, Some(input)).await;
+                assert_ne!(
+                    color, *input,
+                    "server honored adversarial color {input:?} ({scenario})",
+                );
+                assert!(
+                    validate_player_color(&color),
+                    "fallback color {color:?} for adversarial input {input:?} \
+                     ({scenario}) is not in palette",
+                );
+            }
+        }
+
+        /// An attacker who sends *both* fields adversarially still gets
+        /// nothing they asked for.
+        #[tokio::test]
+        async fn join_with_both_fields_adversarial_falls_back_independently() {
+            let state = test_state();
+            for ((bad_name, name_scenario), (bad_color, color_scenario)) in ADVERSARIAL_NAMES
+                .iter()
+                .zip(ADVERSARIAL_COLORS.iter().cycle())
+            {
+                let (name, color) = join_with(&state, Some(bad_name), Some(bad_color)).await;
+                assert_ne!(
+                    name, *bad_name,
+                    "server honored adversarial name {bad_name:?} ({name_scenario}) \
+                     when paired with color {bad_color:?}",
+                );
+                assert_ne!(
+                    color, *bad_color,
+                    "server honored adversarial color {bad_color:?} ({color_scenario}) \
+                     when paired with name {bad_name:?}",
+                );
+                assert!(validate_player_name(&name));
+                assert!(validate_player_color(&color));
+            }
+        }
+
+        /// Sanity: a payload that picks a real predefined pair *is* honored,
+        /// so the fallback isn't just unconditional rejection.
+        #[tokio::test]
+        async fn join_with_valid_name_and_color_is_honored() {
+            let state = test_state();
+            let (name, color) = join_with(&state, Some("Brave Panda"), Some("#38bdf8")).await;
+            assert_eq!(name, "Brave Panda");
+            assert_eq!(color, "#38bdf8");
+        }
+
+        /// Validation happens per-field — a valid pick on one side is not
+        /// dropped just because the other side is adversarial.
+        #[tokio::test]
+        async fn invalid_field_does_not_drag_down_the_valid_one() {
+            let state = test_state();
+
+            // Valid name + adversarial color → name kept, color regenerated.
+            let (name, color) = join_with(&state, Some("Gentle Otter"), Some("#000000")).await;
+            assert_eq!(name, "Gentle Otter");
+            assert_ne!(color, "#000000");
+            assert!(validate_player_color(&color));
+
+            // Adversarial name + valid color → color kept, name regenerated.
+            let (name, color) = join_with(&state, Some("Hax0r Pwnd"), Some("#a78bfa")).await;
+            assert_ne!(name, "Hax0r Pwnd");
+            assert!(validate_player_name(&name));
+            assert_eq!(color, "#a78bfa");
+        }
+
+        /// Sanity: when the client doesn't request anything at all, the
+        /// server-generated defaults still pass the validators. This keeps
+        /// the validator contract honest — `generate_player_*` must produce
+        /// values that `validate_player_*` accepts, otherwise the fallback
+        /// path itself would be a vulnerability.
+        #[tokio::test]
+        async fn server_defaults_always_satisfy_the_validator() {
+            let state = test_state();
+            for _ in 0..32 {
+                let (name, color) = join_with(&state, None, None).await;
+                assert!(
+                    validate_player_name(&name),
+                    "server-generated name {name:?} does not pass validator",
+                );
+                assert!(
+                    validate_player_color(&color),
+                    "server-generated color {color:?} does not pass validator",
+                );
+            }
         }
     }
 }
