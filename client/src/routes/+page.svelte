@@ -5,8 +5,7 @@
 	import { gs, connect, setOnWelcome, defaultWsUrl } from '$lib/game/connection.svelte';
 	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
-	import Button from '$lib/components/Button.svelte';
-	import GameSetupForm from '$lib/components/GameSetupForm.svelte';
+	import WelcomeView from '$lib/components/views/WelcomeView.svelte';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let roomCodeInput = $state('');
@@ -75,78 +74,20 @@
 	}
 </script>
 
-<main>
-	<div class="pregame">
-		<h1 class="shizuru-regular">edif.io</h1>
-		<GameSetupForm
-			modes={gameModes}
-			bind:gameMode={selectedGameMode}
-			bind:matchDuration
-			bind:gameOptions={gameOptionValues}
-			bind:roomCode={roomCodeInput}
-			bind:wsUrl
-			showRoomCodeInput
-			showServerUrl={debugMode}
-			onsubmit={handleSubmit}
-		>
-			{#snippet buttons()}
-				<Button
-					label="Create Room"
-					onclick={createRoom}
-					disabled={gs.phase === 'connecting' || !!roomCodeInput}
-				/>
-				<Button
-					label="Join Room"
-					onclick={joinRoom}
-					disabled={gs.phase === 'connecting' || !roomCodeInput}
-				/>
-			{/snippet}
-		</GameSetupForm>
-		{#if gs.errorMessage}
-			<p class="error">{gs.errorMessage}</p>
-		{/if}
-		{#if debugMode}
-			<p class="meta">socket: {gs.socketState}</p>
-			{#if gs.lastSocketDetail}
-				<p class="meta">{gs.lastSocketDetail}</p>
-			{/if}
-		{/if}
-	</div>
-</main>
-
-<style>
-	h1 {
-		font-size: 4rem;
-		text-align: center;
-		margin: 1rem 0 0 0;
-	}
-	main {
-		height: 100vh;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: stretch;
-	}
-	.pregame {
-		width: 100%;
-		max-width: 460px;
-		margin: 0 auto;
-		padding: 0.5rem 1.25rem 10rem 1.25rem;
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.meta {
-		margin: 0;
-		font-size: 0.8rem;
-	}
-	.error {
-		background-color: transparent;
-		color: red;
-		padding: 0.5rem;
-		border: 2px solid red;
-		border-radius: 0.5rem;
-		font-size: 0.8rem;
-		margin: 0;
-	}
-</style>
+<WelcomeView
+	{gameModes}
+	bind:gameMode={selectedGameMode}
+	bind:matchDuration
+	bind:gameOptions={gameOptionValues}
+	bind:roomCode={roomCodeInput}
+	bind:wsUrl
+	showServerUrl={debugMode}
+	errorMessage={gs.errorMessage}
+	connecting={gs.phase === 'connecting'}
+	debug={debugMode}
+	socketState={gs.socketState}
+	lastSocketDetail={gs.lastSocketDetail}
+	oncreate={createRoom}
+	onjoin={joinRoom}
+	onsubmit={handleSubmit}
+/>
