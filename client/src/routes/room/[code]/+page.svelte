@@ -21,11 +21,7 @@
 	import { nextBlobLayout, blobRadius, type BlobLayout } from '$lib/game/sim';
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
-	import Button from '$lib/components/Button.svelte';
-	import PowerUpBadge from '$lib/components/PowerUpBadge.svelte';
-	import RulesDialog from '$lib/components/RulesDialog.svelte';
-	import TextInput from '$lib/components/TextInput.svelte';
-	import { LEAVE_ICON, SETTINGS_ICON } from '$lib/constants';
+	import GameRoomView from '$lib/components/views/GameRoomView.svelte';
 
 	type PowerUpMeta = {
 		emoji: string;
@@ -65,7 +61,6 @@
 
 	let arenaEl: HTMLDivElement | null = $state(null);
 	let blobLayout: BlobLayout = $state({});
-	let debugOpen = $state(false);
 	let animationHandle = 0;
 	let visualHeight = $state(0);
 	let timerDisplayMs = $state<number | null>(null);
@@ -264,6 +259,74 @@
 		copyTimeout = window.setTimeout(() => (copyConfirmed = false), 1500);
 	}
 
+	// --- View-model derived from the live store + animation state ---
+
+	let inLobby = $derived(!!gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner);
+	let isHost = $derived(!!gs.room && gs.playerId === gs.room.hostPlayerId);
+	let gameOver = $derived(!!gs.room?.matchWinner);
+	let timerLabel = $derived(
+		timerDisplayMs != null && !gameOver ? formatTimer(timerDisplayMs) : null
+	);
+	let showWaitingForPrompt = $derived(!gs.myPrompt && !gameOver);
+
+	let activeEffectsView = $derived(
+		myActiveEffects.map((e) => ({
+			kind: e.kind,
+			emoji: e.emoji,
+			label: e.label,
+			fraction: effectFractions[e.kind] ?? 1,
+			disablesInput: e.disablesInput
+		}))
+	);
+
+	let myPendingView = $derived(
+		myPendingPowerUps.map((pu) => ({
+			offerId: pu.offerId,
+			emoji: POWERUP_META[pu.kind].emoji,
+			ringOffset: powerupRingOffsets[pu.offerId] ?? 0
+		}))
+	);
+
+	let otherPendingView = $derived(
+		otherPendingPowerUps.map((pu) => ({
+			offerId: pu.offerId,
+			emoji: POWERUP_META[pu.kind].emoji,
+			label: `${pu.playerName} vying for ${POWERUP_META[pu.kind].label}`,
+			fraction: 1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE,
+			color: pu.playerColor
+		}))
+	);
+
+	let powerUpToastView = $derived(
+		gs.powerUpToast
+			? { emoji: POWERUP_META[gs.powerUpToast].emoji, label: POWERUP_META[gs.powerUpToast].label }
+			: null
+	);
+
+	let blobs = $derived(
+		(gs.room?.players ?? []).map((player) => ({
+			id: player.id,
+			name: player.name,
+			color: player.color,
+			progress: player.progress,
+			size: player.size,
+			isMe: player.id === gs.playerId,
+			emojis: playerPowerUpEmojis(player.id),
+			x: blobLayout[player.id]?.x ?? 0,
+			y: blobLayout[player.id]?.y ?? 0,
+			diameter: circleSize(player)
+		}))
+	);
+
+	let debugInfo = $derived({
+		gameKey: gs.gameKey,
+		roomCode: gs.room?.roomCode ?? '',
+		socket: socketStateLabel(),
+		inbound: gs.inboundCount,
+		outbound: gs.outboundCount,
+		players: gs.room?.players.length ?? 0
+	});
+
 	onMount(() => {
 		setOnDisconnect(() => goto(resolve('/')));
 
@@ -289,540 +352,39 @@
 	});
 </script>
 
-<main class="game" style:--vvh={visualHeight ? `${visualHeight}px` : null}>
-	{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
-		<RulesDialog />
-	{/if}
-	<div class="leave">
-		<Button label={LEAVE_ICON} onclick={leaveRoom} />
-		{#if gs.room && gs.playerId === gs.room.hostPlayerId}
-			<Button label={SETTINGS_ICON} onclick={editRoom} />
-		{/if}
-	</div>
-	<header>
-		{#if gs.room && gs.room.matchRemainingMs == null && !gs.room.matchWinner}
-			<div class="lobby">
-				{#if gs.playerId === gs.room.hostPlayerId}
-					<div class="wide-button">
-						<Button label="Start Match" onclick={startMatch} />
-					</div>
-				{:else}
-					<div class="lobby-wait shizuru-regular">Waiting for host to start...</div>
-				{/if}
-			</div>
-		{:else}
-			{#if timerDisplayMs != null && !gs.room?.matchWinner}
-				<div class="timer" style:color={myColor}>
-					<strong>{formatTimer(timerDisplayMs)}</strong>
-				</div>
-			{/if}
-			{#if gs.myPrompt}
-				<div class="prompt" class:shizuru-regular={promptScrambled}>
-					<strong>{gs.myPrompt}</strong>
-				</div>
-			{:else if !gs.room?.matchWinner}
-				<div class="prompt">
-					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>
-				</div>
-				<div class="wide-button">
-					<Button
-						label="Refresh"
-						onclick={() => {
-							window.location.reload();
-						}}
-					/>
-				</div>
-			{/if}
-			{#if gs.room?.matchWinner}
-				<div class="game-over-container">
-					<h1 class="shizuru-regular">Game Over</h1>
-					<div class="wide-button">
-						<Button label="Rematch" onclick={rematch} />
-					</div>
-				</div>
-			{:else}
-				{#if otherPendingPowerUps.length > 0}
-					<div class="other-offers">
-						{#each otherPendingPowerUps as pu (pu.offerId)}
-							<PowerUpBadge
-								emoji={POWERUP_META[pu.kind].emoji}
-								label="{pu.playerName} vying for {POWERUP_META[pu.kind].label}"
-								fraction={1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE}
-								barColor={pu.playerColor}
-								labelColor={pu.playerColor}
-								variant="offer"
-							/>
-						{/each}
-					</div>
-				{/if}
-				{#if gs.powerUpToast}
-					{@const meta = POWERUP_META[gs.powerUpToast]}
-					{#key gs.powerUpToast}
-						<div class="powerup-toast">
-							{meta.emoji}
-							{meta.label}
-						</div>
-					{/key}
-				{/if}
-				<div class="input-row">
-					{#if myPendingPowerUps.length > 0}
-						<div class="powerup-tray">
-							{#each myPendingPowerUps as pu (pu.offerId)}
-								<div class="powerup-slot">
-									<svg class="countdown-ring" viewBox="0 0 40 40">
-										<circle class="ring-bg" r="17" cx="20" cy="20" />
-										<circle
-											class="ring-fg"
-											r="17"
-											cx="20"
-											cy="20"
-											stroke-dasharray={RING_CIRCUMFERENCE}
-											stroke-dashoffset={powerupRingOffsets[pu.offerId] ?? 0}
-											style:stroke={myColor}
-										/>
-									</svg>
-									<span class="powerup-emoji">{POWERUP_META[pu.kind].emoji}</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
-					{#if gs.myPrompt}
-						<div class="input-container" class:disabled={inputDisabled}>
-							<TextInput
-								bind:el={promptInputEl}
-								value={gs.promptInput}
-								oninput={(e) => handlePromptInput(e.currentTarget.value)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' && !inputDisabled) submitPrompt();
-								}}
-								placeholder={gs.inputPlaceholder || 'Type your answer; press return.'}
-								inputmode={gs.inputMode}
-								enterkeyhint="go"
-								autocomplete="off"
-								autocorrect="off"
-								autocapitalize="off"
-								spellcheck="false"
-								disabled={inputDisabled}
-								inlineButtonLabel="Go"
-								inlineButtonOnclick={() => submitPrompt()}
-							/>
-						</div>
-						{#if myActiveEffects.length > 0}
-							<div class="active-effects">
-								{#each myActiveEffects as effect (effect.kind)}
-									<PowerUpBadge
-										emoji={effect.emoji}
-										label={effect.label}
-										fraction={effectFractions[effect.kind] ?? 1}
-										barColor={effect.disablesInput ? '#1e40af' : '#92400e'}
-										variant={effect.disablesInput ? 'debuff' : 'buff'}
-									/>
-								{/each}
-							</div>
-						{/if}
-					{/if}
-				</div>
-			{/if}
-			{#if gs.latestRoundSummary}
-				<div class="result" style:color={gs.latestRoundSummaryColor || null}>
-					{gs.latestRoundSummary}
-				</div>
-			{/if}
-		{/if}
-	</header>
-	<div class="arena" bind:this={arenaEl}>
-		{#if gs.room}
-			{#each gs.room.players as player (player.id)}
-				<div
-					class="blob {player.id === gs.playerId ? 'me' : ''}"
-					style={`--blob-color:${player.color}; width:${circleSize(player)}px; height:${circleSize(player)}px; left:${(blobLayout[player.id]?.x ?? 0) - circleSize(player) / 2}px; top:${(blobLayout[player.id]?.y ?? 0) - circleSize(player) / 2}px;`}
-				>
-					{#if player.id === gs.playerId}
-						<div class="you-tag">YOU</div>
-					{/if}
-					<div class="name">{player.name}</div>
-					<div class="powerup-emojis">{playerPowerUpEmojis(player.id)}</div>
-					<div class="size">{player.size.toFixed(1)}</div>
-					<div class="progress">{player.progress}</div>
-				</div>
-			{/each}
-		{/if}
-	</div>
-	{#if gs.room?.roomCode}
-		<div class="room">
-			{#if copyConfirmed}
-				<span class="copy-toast"><strong>LINK COPIED</strong></span>
-			{/if}
-			<input
-				type="button"
-				class="shizuru-regular"
-				value={gs.room.roomCode}
-				onclick={copyRoomLink}
-			/>
-		</div>
-	{/if}
-	{#if debugMode}
-		<aside class="debug">
-			<Button
-				label={debugOpen ? 'Hide' : 'Stats for nerds'}
-				onclick={() => (debugOpen = !debugOpen)}
-			/>
-			{#if debugOpen}
-				<dl>
-					<dt>game</dt>
-					<dd>{gs.gameKey || 'unknown'}</dd>
-					<dt>room</dt>
-					<dd>{gs.room?.roomCode ?? '-'}</dd>
-					<dt>socket</dt>
-					<dd>{socketStateLabel()}</dd>
-					<dt>inbound</dt>
-					<dd>{gs.inboundCount}</dd>
-					<dt>outbound</dt>
-					<dd>{gs.outboundCount}</dd>
-					<dt>players</dt>
-					<dd>{gs.room?.players.length ?? 0}</dd>
-				</dl>
-			{/if}
-		</aside>
-	{/if}
-</main>
-
-<style>
-	main {
-		min-height: 100vh;
-	}
-
-	.game {
-		display: grid;
-		grid-template-rows: auto 1fr;
-	}
-
-	header {
-		padding: 0.75rem;
-		display: grid;
-		gap: 0.5rem;
-		position: relative;
-		z-index: 2;
-	}
-
-	.lobby {
-		text-align: center;
-		margin-top: 6rem;
-	}
-
-	.host {
-		padding-top: 6rem;
-	}
-
-	.lobby-wait {
-		font-size: 3rem;
-		margin: 0 auto;
-		max-width: 400px;
-	}
-
-	.timer {
-		font-size: 3rem;
-		text-align: center;
-		margin-top: 3.5rem;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.prompt {
-		font-size: 2rem;
-		text-align: center;
-		margin: 1rem 0 2rem 0;
-	}
-
-	.input-row {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		margin: 0 auto;
-		width: 100%;
-		max-width: 480px;
-	}
-
-	.input-container {
-		display: flex;
-		position: relative;
-		flex: 1;
-		min-width: 0;
-	}
-
-	.input-container.disabled {
-		opacity: 0.5;
-		pointer-events: none;
-	}
-
-	.powerup-tray {
-		--slot-size: 40px;
-		display: grid;
-		grid-template-columns: repeat(2, auto);
-		gap: 0.35rem;
-		flex-shrink: 0;
-		max-height: var(--slot-size);
-		overflow: visible;
-	}
-
-	.powerup-slot {
-		position: relative;
-		width: var(--slot-size);
-		height: var(--slot-size);
-		display: grid;
-		place-items: center;
-	}
-
-	.countdown-ring {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-	}
-
-	.ring-bg {
-		fill: none;
-		stroke: #e5e7eb;
-		stroke-width: 3;
-	}
-
-	.ring-fg {
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 3;
-		stroke-linecap: round;
-		transform: rotate(-90deg);
-		transform-origin: center;
-	}
-
-	.powerup-emoji {
-		font-size: 1.2rem;
-		line-height: 1;
-		z-index: 1;
-	}
-
-	.other-offers {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		margin: 0 auto;
-		max-width: 480px;
-		width: 100%;
-	}
-
-	.powerup-toast {
-		text-align: center;
-		font-size: 1rem;
-		font-weight: 700;
-		padding: 0.35rem 0.75rem;
-		border-radius: 0.5rem;
-		background: #d1fae5;
-		color: #065f46;
-		animation: fade-in-out 3s ease forwards;
-		margin: 0 auto 0.4rem;
-	}
-
-	.active-effects {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		flex-shrink: 0;
-	}
-
-	.game-over-container {
-		text-align: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.game-over-container h1 {
-		font-size: 5rem;
-		margin-bottom: 1rem;
-	}
-
-	.result {
-		font-size: 0.9rem;
-		text-align: center;
-		margin-top: 0.25rem;
-	}
-
-	.arena {
-		position: relative;
-		overflow: hidden;
-		min-height: 62vh;
-	}
-
-	.blob {
-		position: absolute;
-		background: var(--blob-color);
-		border: 2px solid var(--blob-color);
-		border-radius: 9999px;
-		display: grid;
-		place-content: center;
-		gap: 0.2rem;
-		text-align: center;
-		padding: 0.5rem;
-		box-sizing: border-box;
-		text-wrap: nowrap;
-		color: #fff;
-		text-shadow:
-			0 0 3px rgba(0, 0, 0, 0.9),
-			0 1px 2px rgba(0, 0, 0, 0.9);
-		transition:
-			width 180ms linear,
-			height 180ms linear;
-	}
-
-	.blob.me {
-		box-shadow:
-			inset 0 0 0 3px #fff,
-			0 0 0 3px #111,
-			0 0 22px 6px color-mix(in srgb, var(--blob-color) 75%, transparent);
-		z-index: 1;
-		animation: me-pulse 1.8s ease-in-out infinite;
-	}
-
-	@keyframes me-pulse {
-		0%,
-		100% {
-			box-shadow:
-				inset 0 0 0 3px #fff,
-				0 0 0 3px #111,
-				0 0 16px 3px color-mix(in srgb, var(--blob-color) 60%, transparent);
-		}
-		50% {
-			box-shadow:
-				inset 0 0 0 3px #fff,
-				0 0 0 3px #111,
-				0 0 28px 10px color-mix(in srgb, var(--blob-color) 90%, transparent);
-		}
-	}
-
-	.you-tag {
-		justify-self: center;
-		background: #fff;
-		color: #111;
-		font-size: 0.7rem;
-		font-weight: 900;
-		letter-spacing: 0.12em;
-		padding: 0.12rem 0.5rem;
-		border-radius: 9999px;
-		white-space: nowrap;
-		pointer-events: none;
-		text-shadow: none;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-	}
-
-	.name {
-		font-size: 0.85rem;
-		font-weight: 600;
-	}
-
-	.powerup-emojis {
-		font-size: 0.85rem;
-		font-weight: 600;
-	}
-
-	.size,
-	.progress {
-		font-size: 0.75rem;
-	}
-
-	.leave {
-		position: fixed;
-		top: 0.5rem;
-		left: 0.5rem;
-		z-index: 3;
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.leave :global(.btn) {
-		flex: 0 0 auto;
-		padding: 0.4rem 0.7rem;
-		font-size: 1.1rem;
-		line-height: 1;
-	}
-
-	.room {
-		position: fixed;
-		bottom: 2rem;
-		left: 0.5rem;
-		right: 0.5rem;
-		z-index: 3;
-		text-align: center;
-	}
-
-	.copy-toast {
-		display: block;
-		animation: fade-in-out 1.5s ease forwards;
-	}
-
-	@keyframes fade-in-out {
-		0% {
-			opacity: 0;
-			translate: 0 4px;
-		}
-		15% {
-			opacity: 1;
-			translate: 0 0;
-		}
-		75% {
-			opacity: 1;
-		}
-		100% {
-			opacity: 0;
-		}
-	}
-
-	.room input[type='button'] {
-		background-color: transparent;
-		border: none;
-		color: black;
-		font-size: 3rem;
-		cursor: pointer;
-	}
-
-	.debug {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		position: fixed;
-		right: 0.5rem;
-		bottom: 0.5rem;
-		border-radius: 0.4rem;
-		padding: 0.5rem;
-		width: 240px;
-		z-index: 3;
-	}
-
-	dl {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.15rem 0.4rem;
-		margin: 0.45rem 0 0 0;
-		font-size: 0.8rem;
-	}
-
-	dd {
-		margin: 0;
-		text-align: right;
-	}
-
-	@media (max-width: 768px) and (orientation: portrait) {
-		main {
-			min-height: 0;
-			height: var(--vvh, 100vh);
-			max-height: var(--vvh, 100vh);
-			overflow: hidden;
-		}
-
-		.arena {
-			min-height: 0;
-		}
-	}
-</style>
+<GameRoomView
+	{inLobby}
+	{isHost}
+	{gameOver}
+	{timerLabel}
+	{myColor}
+	myPrompt={gs.myPrompt}
+	{promptScrambled}
+	{showWaitingForPrompt}
+	roundSummary={gs.latestRoundSummary}
+	roundSummaryColor={gs.latestRoundSummaryColor}
+	promptInput={gs.promptInput}
+	inputPlaceholder={gs.inputPlaceholder}
+	inputMode={gs.inputMode}
+	{inputDisabled}
+	bind:promptInputEl
+	activeEffects={activeEffectsView}
+	myPendingPowerUps={myPendingView}
+	otherPendingPowerUps={otherPendingView}
+	powerUpToast={powerUpToastView}
+	{blobs}
+	bind:arenaEl
+	roomCode={gs.room?.roomCode ?? null}
+	{copyConfirmed}
+	{visualHeight}
+	debug={debugMode}
+	{debugInfo}
+	onleave={leaveRoom}
+	onedit={editRoom}
+	onstart={startMatch}
+	onrematch={rematch}
+	onrefresh={() => window.location.reload()}
+	oncopy={copyRoomLink}
+	oninput={handlePromptInput}
+	onsubmit={submitPrompt}
+/>
