@@ -3,14 +3,17 @@
 	import { m } from '$lib/paraglide/messages';
 	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 
-	// Display names for the viewer-language picker. Each language names itself.
-	const LANGUAGE_NAMES: Record<string, () => string> = {
-		en: m.lang_name_en,
-		l33t: m.lang_name_l33t
-	};
+	// Each language names itself via a `lang_name_<locale>` message (the endonym,
+	// e.g. "Español"), so adding a viewer language needs no change here — just the
+	// new key in the catalogs. Fall back to the raw code if a name is missing.
+	const names = m as unknown as Record<
+		string,
+		((inputs?: Record<string, never>) => string) | undefined
+	>;
 
 	function nameFor(locale: string): string {
-		return (LANGUAGE_NAMES[locale] ?? (() => locale))();
+		const fn = names[`lang_name_${locale.replace(/-/g, '_')}`];
+		return typeof fn === 'function' ? fn() : locale;
 	}
 
 	// `setLocale` persists to localStorage and reloads the page, so the whole app
