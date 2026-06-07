@@ -1,8 +1,18 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		sveltekit(),
+		paraglideVitePlugin({
+			project: './project.inlang',
+			outdir: './src/lib/paraglide',
+			// Viewer language is an explicit, client-persisted choice. Dropping
+			// `preferredLanguage` keeps SSR/first paint deterministically English.
+			strategy: ['localStorage', 'baseLocale']
+		})
+	],
 	server: {
 		proxy: {
 			'/ws': {

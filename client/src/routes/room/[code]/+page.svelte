@@ -22,10 +22,11 @@
 	import type { PlayerSnapshot, PowerUpKind } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import GameRoomView from '$lib/components/views/GameRoomView.svelte';
+	import { m } from '$lib/paraglide/messages';
+	import { inputPlaceholder as localizedPlaceholder } from '$lib/i18n/chrome';
 
 	type PowerUpMeta = {
 		emoji: string;
-		label: string;
 		affectsSelf: boolean;
 		disablesInput: boolean;
 	};
@@ -33,29 +34,37 @@
 	const POWERUP_META: Record<PowerUpKind, PowerUpMeta> = {
 		doublePoints: {
 			emoji: '\u{1F4AA}',
-			label: '2x Points',
 			affectsSelf: true,
 			disablesInput: false
 		},
 		scrambleFont: {
 			emoji: '\u{1F92A}',
-			label: 'Scrambled!',
 			affectsSelf: false,
 			disablesInput: false
 		},
 		scoreSteal: {
 			emoji: '\u{1F422}',
-			label: 'Blue Shell!',
 			affectsSelf: true,
 			disablesInput: false
 		},
 		ongoingScoreSteal: {
 			emoji: '\u{1F355}',
-			label: 'Point Eater!',
 			affectsSelf: true,
 			disablesInput: false
 		}
 	};
+
+	// Power-up display names are viewer-language UI, keyed by PowerUpKind.
+	const POWERUP_LABEL: Record<PowerUpKind, () => string> = {
+		doublePoints: m.powerup_doublePoints,
+		scrambleFont: m.powerup_scrambleFont,
+		scoreSteal: m.powerup_scoreSteal,
+		ongoingScoreSteal: m.powerup_ongoingScoreSteal
+	};
+
+	function powerupLabel(kind: PowerUpKind): string {
+		return POWERUP_LABEL[kind]();
+	}
 
 	const RING_CIRCUMFERENCE = 106.81;
 
@@ -273,7 +282,7 @@
 		myActiveEffects.map((e) => ({
 			kind: e.kind,
 			emoji: e.emoji,
-			label: e.label,
+			label: powerupLabel(e.kind),
 			fraction: effectFractions[e.kind] ?? 1,
 			disablesInput: e.disablesInput
 		}))
@@ -291,7 +300,7 @@
 		otherPendingPowerUps.map((pu) => ({
 			offerId: pu.offerId,
 			emoji: POWERUP_META[pu.kind].emoji,
-			label: `${pu.playerName} vying for ${POWERUP_META[pu.kind].label}`,
+			label: m.powerup_vying({ player: pu.playerName, label: powerupLabel(pu.kind) }),
 			fraction: 1 - (powerupRingOffsets[pu.offerId] ?? 0) / RING_CIRCUMFERENCE,
 			color: pu.playerColor
 		}))
@@ -299,7 +308,7 @@
 
 	let powerUpToastView = $derived(
 		gs.powerUpToast
-			? { emoji: POWERUP_META[gs.powerUpToast].emoji, label: POWERUP_META[gs.powerUpToast].label }
+			? { emoji: POWERUP_META[gs.powerUpToast].emoji, label: powerupLabel(gs.powerUpToast) }
 			: null
 	);
 
@@ -364,7 +373,7 @@
 	roundSummary={gs.latestRoundSummary}
 	roundSummaryColor={gs.latestRoundSummaryColor}
 	promptInput={gs.promptInput}
-	inputPlaceholder={gs.inputPlaceholder}
+	inputPlaceholder={localizedPlaceholder(gs.gameKey, gs.inputPlaceholder)}
 	inputMode={gs.inputMode}
 	{inputDisabled}
 	bind:promptInputEl

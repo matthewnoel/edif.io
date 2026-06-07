@@ -2,6 +2,8 @@
 	import type { GameModeInfo } from '$lib/game/protocol';
 	import Button from '$lib/components/Button.svelte';
 	import GameSetupForm from '$lib/components/GameSetupForm.svelte';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	interface Props {
 		gameModes: GameModeInfo[];
@@ -42,7 +44,7 @@
 
 <main>
 	<div class="pregame">
-		<h1 class="shizuru-regular">edif.io</h1>
+		<h1 class="shizuru-regular">{m.app_title()}</h1>
 		<GameSetupForm
 			modes={gameModes}
 			bind:gameMode
@@ -55,10 +57,15 @@
 			{onsubmit}
 		>
 			{#snippet buttons()}
-				<Button label="Create Room" onclick={oncreate} disabled={connecting || !!roomCode} />
-				<Button label="Join Room" onclick={onjoin} disabled={connecting || !roomCode} />
+				<Button
+					label={m.btn_create_room()}
+					onclick={oncreate}
+					disabled={connecting || !!roomCode}
+				/>
+				<Button label={m.btn_join_room()} onclick={onjoin} disabled={connecting || !roomCode} />
 			{/snippet}
 		</GameSetupForm>
+		<LanguageSwitcher />
 		{#if errorMessage}
 			<p class="error">{errorMessage}</p>
 		{/if}

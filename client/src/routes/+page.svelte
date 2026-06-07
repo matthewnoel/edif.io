@@ -6,6 +6,7 @@
 	import type { GameModeInfo } from '$lib/game/protocol';
 	import { debugMode } from '$lib/debug';
 	import WelcomeView from '$lib/components/views/WelcomeView.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	let wsUrl = $state('ws://localhost:4000/ws');
 	let roomCodeInput = $state('');
@@ -54,11 +55,11 @@
 
 	function joinRoom(): void {
 		if (!roomCodeInput) {
-			gs.errorMessage = 'Enter a room code to join';
+			gs.errorMessage = m.err_enter_room_code();
 			return;
 		}
 		if (roomCodeInput.length < 4) {
-			gs.errorMessage = 'Room codes are 4 letters';
+			gs.errorMessage = m.err_room_code_length();
 			return;
 		}
 		connect(wsUrl, {

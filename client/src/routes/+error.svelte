@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Button from '$lib/components/Button.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	function reload() {
 		location.reload();
@@ -8,16 +9,16 @@
 </script>
 
 <main class="err">
-	<h1>Something went wrong</h1>
+	<h1>{m.error_title()}</h1>
 	<p>
 		{#if page.status === 404}
-			We couldn't find that page.
+			{m.error_not_found()}
 		{:else}
-			A new version of edif.io may have just been deployed. Refreshing usually fixes this.
+			{m.error_stale_deploy()}
 		{/if}
 	</p>
 	<div class="actions">
-		<Button label="Refresh" onclick={reload} />
+		<Button label={m.btn_refresh()} onclick={reload} />
 	</div>
 </main>
 

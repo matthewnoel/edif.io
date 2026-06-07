@@ -1,4 +1,5 @@
 import type { HandleClientError } from '@sveltejs/kit';
+import { m } from '$lib/paraglide/messages';
 
 export const handleError: HandleClientError = ({ error }) => {
 	const msg = error instanceof Error ? error.message : String(error);
@@ -7,6 +8,6 @@ export const handleError: HandleClientError = ({ error }) => {
 			msg
 		);
 	return {
-		message: isChunkError ? 'A new version was just deployed. Please refresh.' : 'Unexpected error.'
+		message: isChunkError ? m.error_chunk_reload() : m.error_unexpected()
 	};
 };

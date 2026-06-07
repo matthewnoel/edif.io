@@ -25,3 +25,4 @@ build:
 
 generate:
 	bash scripts/generate-agents-md.sh
+	cd client && npm run leetify

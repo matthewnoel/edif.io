@@ -3,6 +3,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import GameSetupForm from '$lib/components/GameSetupForm.svelte';
 	import { LEAVE_ICON } from '$lib/constants';
+	import { m } from '$lib/paraglide/messages';
 
 	interface Props {
 		gameModes: GameModeInfo[];
@@ -34,7 +35,7 @@
 		<Button label={LEAVE_ICON} onclick={onback} />
 	</div>
 	<div class="edit">
-		<h1 class="shizuru-regular">Edit Room</h1>
+		<h1 class="shizuru-regular">{m.edit_room_title()}</h1>
 		{#if ready}
 			<GameSetupForm
 				modes={gameModes}
@@ -44,7 +45,7 @@
 				onsubmit={onupdate}
 			>
 				{#snippet buttons()}
-					<Button label="Update Room" onclick={onupdate} disabled={!canSubmit} />
+					<Button label={m.btn_update_room()} onclick={onupdate} disabled={!canSubmit} />
 				{/snippet}
 			</GameSetupForm>
 			{#if errorMessage}

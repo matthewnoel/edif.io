@@ -5,6 +5,8 @@
 	import TextInput from '$lib/components/TextInput.svelte';
 	import Checkbox from '$lib/components/Checkbox.svelte';
 	import RangeInput from '$lib/components/RangeInput.svelte';
+	import { m } from '$lib/paraglide/messages';
+	import { modeLabel, optionLabel, choiceLabel } from '$lib/i18n/chrome';
 
 	interface Props {
 		modes: GameModeInfo[];
@@ -87,7 +89,7 @@
 >
 	{#if showServerUrl}
 		<label>
-			Server URL
+			{m.label_server_url()}
 			<TextInput
 				bind:value={wsUrl}
 				placeholder="ws://localhost:4000/ws"
@@ -100,11 +102,11 @@
 	{/if}
 	{#if modes.length > 0}
 		<label>
-			<strong>Game Mode:</strong>
+			<strong>{m.label_game_mode()}</strong>
 			<Select
 				value={gameMode}
 				onchange={(e) => handleGameModeChange(e.currentTarget.value)}
-				options={modes.map((m) => ({ value: m.key, label: m.label }))}
+				options={modes.map((mode) => ({ value: mode.key, label: modeLabel(mode.key, mode.label) }))}
 			/>
 		</label>
 	{/if}
@@ -112,18 +114,24 @@
 		{#each visibleOptions as opt (opt.key)}
 			{#if opt.type === 'select'}
 				<label>
-					<strong>{opt.label}:</strong>
+					<strong>{optionLabel(gameMode, opt.key, opt.label)}:</strong>
 					<Select
 						value={gameOptions[opt.key] ?? opt.default}
 						onchange={(e) => {
 							gameOptions = { ...gameOptions, [opt.key]: e.currentTarget.value };
 						}}
-						options={opt.choices.map((c) => ({ value: c.value, label: c.label }))}
+						options={opt.choices.map((c) => ({
+							value: c.value,
+							label: choiceLabel(gameMode, opt.key, c.value, c.label)
+						}))}
 					/>
 				</label>
 			{:else if opt.type === 'range'}
 				<label>
-					<strong>{opt.label} ({gameOptions[opt.key] ?? opt.default}):</strong>
+					<strong
+						>{optionLabel(gameMode, opt.key, opt.label)} ({gameOptions[opt.key] ??
+							opt.default}):</strong
+					>
 					<RangeInput
 						min={opt.min}
 						max={opt.max}
@@ -143,13 +151,13 @@
 							};
 						}}
 					/>
-					<strong>{opt.label}</strong>
+					<strong>{optionLabel(gameMode, opt.key, opt.label)}</strong>
 				</label>
 			{/if}
 		{/each}
 	{/if}
 	<label>
-		<strong>Match Duration in Seconds:</strong>
+		<strong>{m.label_match_duration()}</strong>
 		<TextInput
 			bind:value={matchDuration}
 			type="number"
@@ -160,7 +168,7 @@
 	</label>
 	{#if showRoomCodeInput}
 		<label>
-			<strong>Room Code (optional):</strong>
+			<strong>{m.label_room_code_optional()}</strong>
 			<TextInput
 				value={roomCode}
 				oninput={(e) => {
