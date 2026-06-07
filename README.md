@@ -18,6 +18,15 @@ Pluggable multiplayer prompt-race game. **[Play Now](https://edif.io)**
  - [Rust](https://rust-lang.org/tools/install/)
  - [node.js](https://github.com/nvm-sh/nvm)
 
+### Installing Dependencies
+
+```sh
+make install
+```
+
+Run this after cloning, and again whenever dependencies change (for example after
+pulling a branch that updates `client/package.json`).
+
 ### Running Locally
 
 ```sh
