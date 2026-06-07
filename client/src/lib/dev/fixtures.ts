@@ -150,7 +150,22 @@ export const gameModes: GameModeInfo[] = [
 			}
 		]
 	},
-	{ key: 'keyboarding', label: 'Keyboarding', options: [] },
+	{
+		key: 'keyboarding',
+		label: 'Keyboarding',
+		options: [
+			{
+				key: 'wordSet',
+				label: 'Word Set',
+				type: 'select',
+				default: 'english',
+				choices: [
+					{ value: 'english', label: 'English' },
+					{ value: 'l33t', label: 'L33T' }
+				]
+			}
+		]
+	},
 	{
 		key: 'state-abbreviations',
 		label: 'US State Abbreviations',

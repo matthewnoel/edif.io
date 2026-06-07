@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	interface Props {
 		visible: boolean;
@@ -11,8 +12,8 @@
 
 {#if visible}
 	<div class="banner" role="status" aria-live="polite">
-		<span>A new version of edif.io is available.</span>
-		<Button label="Refresh" onclick={onrefresh} />
+		<span>{m.update_available()}</span>
+		<Button label={m.btn_refresh()} onclick={onrefresh} />
 	</div>
 {/if}
 

@@ -1,6 +1,10 @@
 NODE_VERSION := $(shell sed 's/^v//' client/.nvmrc)
 
-.PHONY: dev test check build format generate
+.PHONY: dev test check build format generate install
+
+install:
+	cargo fetch
+	cd client && npm ci
 
 dev:
 	trap 'kill 0' EXIT; \
@@ -25,3 +29,4 @@ build:
 
 generate:
 	bash scripts/generate-agents-md.sh
+	cd client && npm run leetify

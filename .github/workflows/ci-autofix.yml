@@ -100,6 +100,11 @@ jobs:
         run: npm run format
         working-directory: client
 
+      - name: Regenerate i18n catalog
+        if: needs.changes.outputs.web == 'true'
+        run: npm run leetify
+        working-directory: client
+
       - name: Regenerate AGENTS.md files
         run: bash scripts/generate-agents-md.sh
 

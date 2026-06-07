@@ -1,0 +1,91 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+
+	"app_title": "edif.io",
+
+	"btn_create_room": "Create Room",
+	"btn_join_room": "Join Room",
+	"btn_start_match": "Start Match",
+	"btn_rematch": "Rematch",
+	"btn_update_room": "Update Room",
+	"btn_got_it": "Got it!",
+	"btn_refresh": "Refresh",
+	"btn_go": "Go",
+
+	"label_server_url": "Server URL",
+	"label_game_mode": "Game Mode:",
+	"label_match_duration": "Match Duration in Seconds:",
+	"label_room_code_optional": "Room Code (optional):",
+	"label_language": "Language",
+
+	"err_enter_room_code": "Enter a room code to join",
+	"err_room_code_length": "Room codes are 4 letters",
+
+	"lobby_waiting_host": "Waiting for host to start...",
+	"prompt_waiting": "Waiting for prompt...",
+	"game_over": "Game Over",
+	"input_placeholder_fallback": "Type your answer; press return.",
+	"you_label": "YOU",
+	"link_copied": "LINK COPIED",
+
+	"rules_title": "How to Play",
+	"rules_dismiss_aria": "Dismiss rules",
+	"rules_grow": "Answer correctly to **grow** your blob",
+	"rules_shrink": "Wrong answers make you **shrink**",
+	"rules_powerups": "Players will receive **power-ups** during the match",
+	"rules_winner": "The **biggest blob** wins once the timer runs out",
+
+	"edit_room_title": "Edit Room",
+
+	"update_available": "A new version of edif.io is available.",
+
+	"error_title": "Something went wrong",
+	"error_not_found": "We couldn't find that page.",
+	"error_stale_deploy": "A new version of edif.io may have just been deployed. Refreshing usually fixes this.",
+	"error_chunk_reload": "A new version was just deployed. Please refresh.",
+	"error_unexpected": "Unexpected error.",
+
+	"powerup_doublePoints": "2x Points",
+	"powerup_scrambleFont": "Scrambled!",
+	"powerup_scoreSteal": "Blue Shell!",
+	"powerup_ongoingScoreSteal": "Point Eater!",
+	"powerup_vying": "{player} vying for {label}",
+
+	"match_winner": "{winner} wins the match",
+	"round_win": "{winner} won +{amount} size",
+	"wrong_self": "Wrong! -{amount} size",
+	"wrong_other": "{player} lost -{amount} size",
+	"player_fallback": "Player {id}",
+	"err_invalid_ws_url": "Invalid WebSocket URL: {url}",
+	"err_ws_generic": "WebSocket error",
+	"err_disconnected": "Disconnected from server",
+
+	"lang_name_en": "English",
+	"lang_name_l33t": "L33T",
+
+	"adapter_keyboarding": "Keyboarding",
+	"placeholder_keyboarding": "Type the word; press return.",
+	"opt_keyboarding_wordSet": "Word Set",
+	"choice_keyboarding_wordSet_english": "English",
+	"choice_keyboarding_wordSet_l33t": "L33T",
+
+	"adapter_arithmetic": "Arithmetic",
+	"placeholder_arithmetic": "Enter the solution; press return.",
+	"opt_arithmetic_operation": "Operation",
+	"choice_arithmetic_operation_addition": "Addition",
+	"choice_arithmetic_operation_subtraction": "Subtraction",
+	"choice_arithmetic_operation_multiplication": "Multiplication",
+	"choice_arithmetic_operation_division": "Division",
+	"opt_arithmetic_firstTermMinimumDigits": "Minimum Digits in First Term",
+	"opt_arithmetic_firstTermMaximumDigits": "Maximum Digits in First Term",
+	"opt_arithmetic_secondTermMinimumDigits": "Minimum Digits in Second Term",
+	"opt_arithmetic_secondTermMaximumDigits": "Maximum Digits in Second Term",
+	"opt_arithmetic_allowNegativeAnswers": "Allow Negative Answers",
+
+	"adapter_state_abbreviations": "US State Abbreviations",
+	"placeholder_state_abbreviations": "Type the state name or abbreviation; press return.",
+	"opt_state_abbreviations_direction": "Prompt Direction",
+	"choice_state_abbreviations_direction_nameToAbbr": "State Name → Abbreviation",
+	"choice_state_abbreviations_direction_abbrToName": "Abbreviation → State Name",
+	"choice_state_abbreviations_direction_both": "Both Directions"
+}

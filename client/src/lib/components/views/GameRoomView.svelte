@@ -60,6 +60,7 @@
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 	import { LEAVE_ICON, SETTINGS_ICON } from '$lib/constants';
+	import { m } from '$lib/paraglide/messages';
 
 	const RING_CIRCUMFERENCE = 106.81;
 
@@ -168,10 +169,10 @@
 			<div class="lobby">
 				{#if isHost}
 					<div class="wide-button">
-						<Button label="Start Match" onclick={onstart} />
+						<Button label={m.btn_start_match()} onclick={onstart} />
 					</div>
 				{:else}
-					<div class="lobby-wait shizuru-regular">Waiting for host to start...</div>
+					<div class="lobby-wait shizuru-regular">{m.lobby_waiting_host()}</div>
 				{/if}
 			</div>
 		{:else}
@@ -186,17 +187,17 @@
 				</div>
 			{:else if showWaitingForPrompt}
 				<div class="prompt">
-					<div class="host lobby-wait shizuru-regular">Waiting for prompt...</div>
+					<div class="host lobby-wait shizuru-regular">{m.prompt_waiting()}</div>
 				</div>
 				<div class="wide-button">
-					<Button label="Refresh" onclick={onrefresh} />
+					<Button label={m.btn_refresh()} onclick={onrefresh} />
 				</div>
 			{/if}
 			{#if gameOver}
 				<div class="game-over-container">
-					<h1 class="shizuru-regular">Game Over</h1>
+					<h1 class="shizuru-regular">{m.game_over()}</h1>
 					<div class="wide-button">
-						<Button label="Rematch" onclick={onrematch} />
+						<Button label={m.btn_rematch()} onclick={onrematch} />
 					</div>
 				</div>
 			{:else}
@@ -253,7 +254,7 @@
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && !inputDisabled) onsubmit();
 								}}
-								placeholder={inputPlaceholder || 'Type your answer; press return.'}
+								placeholder={inputPlaceholder || m.input_placeholder_fallback()}
 								inputmode={inputMode}
 								enterkeyhint="go"
 								autocomplete="off"
@@ -261,7 +262,7 @@
 								autocapitalize="off"
 								spellcheck="false"
 								disabled={inputDisabled}
-								inlineButtonLabel="Go"
+								inlineButtonLabel={m.btn_go()}
 								inlineButtonOnclick={() => onsubmit()}
 							/>
 						</div>
@@ -295,7 +296,7 @@
 				style={`--blob-color:${blob.color}; width:${blob.diameter}px; height:${blob.diameter}px; left:${blob.x - blob.diameter / 2}px; top:${blob.y - blob.diameter / 2}px;`}
 			>
 				{#if blob.isMe}
-					<div class="you-tag">YOU</div>
+					<div class="you-tag">{m.you_label()}</div>
 				{/if}
 				<div class="name">{blob.name}</div>
 				<div class="powerup-emojis">{blob.emojis}</div>
@@ -307,7 +308,7 @@
 	{#if roomCode}
 		<div class="room">
 			{#if copyConfirmed}
-				<span class="copy-toast"><strong>LINK COPIED</strong></span>
+				<span class="copy-toast"><strong>{m.link_copied()}</strong></span>
 			{/if}
 			<input type="button" class="shizuru-regular" value={roomCode} onclick={oncopy} />
 		</div>

@@ -12,6 +12,8 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	// inlang generates files here (cache, .meta.json) that aren't ours to lint.
+	{ ignores: ['project.inlang/**'] },
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,

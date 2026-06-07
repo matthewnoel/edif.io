@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
 	import CloseButton from '$lib/components/CloseButton.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	const STORAGE_KEY = 'rulesDialogDismissed';
 
@@ -13,6 +14,20 @@
 		localStorage.setItem(STORAGE_KEY, '1');
 	}
 </script>
+
+<!-- Renders a message that may contain **bold** spans. Keeping the emphasis in
+     the message text (rather than splitting it across keys) lets each rule stay
+     a single translatable sentence, and the leetify generator preserves the
+     `**` markers. -->
+{#snippet withBold(text: string)}
+	{#each text.split(/(\*\*[^*]+\*\*)/g) as part, i (i)}
+		{#if part.startsWith('**') && part.endsWith('**')}
+			<strong>{part.slice(2, -2)}</strong>
+		{:else}
+			{part}
+		{/if}
+	{/each}
+{/snippet}
 
 {#if !dismissed}
 	<div
@@ -28,19 +43,19 @@
 			}
 		}}
 	>
-		<div class="rules-card" role="dialog" aria-label="How to Play" tabindex="-1">
+		<div class="rules-card" role="dialog" aria-label={m.rules_title()} tabindex="-1">
 			<div class="card-header">
-				<h2>How to Play</h2>
-				<CloseButton onclick={dismiss} ariaLabel="Dismiss rules" />
+				<h2>{m.rules_title()}</h2>
+				<CloseButton onclick={dismiss} ariaLabel={m.rules_dismiss_aria()} />
 			</div>
 			<ul>
-				<li>Answer correctly to <strong>grow</strong> your blob</li>
-				<li>Wrong answers make you <strong>shrink</strong></li>
-				<li>Players will receieve <strong>power-ups</strong> during the match</li>
-				<li>The <strong>biggest blob</strong> wins once the timer runs out</li>
+				<li>{@render withBold(m.rules_grow())}</li>
+				<li>{@render withBold(m.rules_shrink())}</li>
+				<li>{@render withBold(m.rules_powerups())}</li>
+				<li>{@render withBold(m.rules_winner())}</li>
 			</ul>
 			<div class="footer">
-				<Button label="Got it!" onclick={dismiss} />
+				<Button label={m.btn_got_it()} onclick={dismiss} />
 			</div>
 		</div>
 	</div>

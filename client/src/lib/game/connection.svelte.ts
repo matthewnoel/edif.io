@@ -6,6 +6,7 @@ import {
 	type RoomSnapshot,
 	type ServerMessage
 } from './protocol';
+import { m } from '$lib/paraglide/messages';
 
 export type ConnectionPhase = 'pregame' | 'connecting' | 'ingame';
 
@@ -123,7 +124,9 @@ function handleServerMessage(message: ServerMessage): void {
 				gs.powerUpToast = null;
 				gs.myPrompt = '';
 				const winner = message.room.players.find((p) => p.id === message.room.matchWinner);
-				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.room.matchWinner}`} wins the match`;
+				gs.latestRoundSummary = m.match_winner({
+					winner: winner?.name ?? m.player_fallback({ id: message.room.matchWinner })
+				});
 				gs.latestRoundSummaryColor = winner?.color ?? '';
 			}
 			break;
@@ -146,7 +149,10 @@ function handleServerMessage(message: ServerMessage): void {
 			if (!gs.room) break;
 			{
 				const winner = gs.room.players.find((p) => p.id === message.winnerPlayerId);
-				gs.latestRoundSummary = `${winner?.name ?? `Player ${message.winnerPlayerId}`} won +${message.growthAwarded.toFixed(1)} size`;
+				gs.latestRoundSummary = m.round_win({
+					winner: winner?.name ?? m.player_fallback({ id: message.winnerPlayerId }),
+					amount: message.growthAwarded.toFixed(1)
+				});
 				gs.latestRoundSummaryColor = winner?.color ?? '';
 			}
 			break;
@@ -155,12 +161,15 @@ function handleServerMessage(message: ServerMessage): void {
 			{
 				const isMe = message.playerId === gs.playerId;
 				if (isMe) {
-					gs.latestRoundSummary = `Wrong! -${message.shrinkApplied.toFixed(1)} size`;
+					gs.latestRoundSummary = m.wrong_self({ amount: message.shrinkApplied.toFixed(1) });
 					gs.latestRoundSummaryColor = '#e74c3c';
 					gs.promptInput = '';
 				} else {
 					const player = gs.room.players.find((p) => p.id === message.playerId);
-					gs.latestRoundSummary = `${player?.name ?? `Player ${message.playerId}`} lost -${message.shrinkApplied.toFixed(1)} size`;
+					gs.latestRoundSummary = m.wrong_other({
+						player: player?.name ?? m.player_fallback({ id: message.playerId }),
+						amount: message.shrinkApplied.toFixed(1)
+					});
 					gs.latestRoundSummaryColor = player?.color ?? '';
 				}
 			}
@@ -234,7 +243,7 @@ export function connect(
 	try {
 		socket = new WebSocket(wsUrl);
 	} catch {
-		gs.errorMessage = `Invalid WebSocket URL: ${wsUrl}`;
+		gs.errorMessage = m.err_invalid_ws_url({ url: wsUrl });
 		gs.phase = 'pregame';
 		return;
 	}
@@ -263,7 +272,7 @@ export function connect(
 	};
 
 	socket.onerror = () => {
-		gs.errorMessage = 'WebSocket error';
+		gs.errorMessage = m.err_ws_generic();
 		gs.lastSocketDetail = 'socket error event fired';
 	};
 
@@ -272,7 +281,7 @@ export function connect(
 		gs.lastSocketDetail = `closed code=${event.code} reason=${event.reason || '(none)'}`;
 		const wasActive = gs.phase !== 'pregame';
 		if (wasActive) {
-			gs.errorMessage = 'Disconnected from server';
+			gs.errorMessage = m.err_disconnected();
 		}
 		gs.phase = 'pregame';
 		gs.room = null;

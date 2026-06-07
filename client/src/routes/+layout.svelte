@@ -7,8 +7,15 @@
 	import favicon192 from '$lib/assets/favicon-192x192.png';
 	import favicon512 from '$lib/assets/favicon-512x512.png';
 	import appleTouchIcon from '$lib/assets/apple-touch-icon.png';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	let { children } = $props();
+
+	// Keep <html lang> in sync with the viewer language (client-only; SSR keeps
+	// the base locale from app.html).
+	$effect(() => {
+		document.documentElement.lang = getLocale();
+	});
 </script>
 
 <svelte:head>
