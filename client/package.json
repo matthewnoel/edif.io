@@ -28,7 +28,7 @@
 		"@inlang/plugin-message-format": "^4.4.0",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-node": "^5.5.4",
-		"@sveltejs/kit": "^2.61.1",
+		"@sveltejs/kit": "^2.63.1",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/node": "^25",
 		"eslint": "^10.4.0",
