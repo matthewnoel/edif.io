@@ -35,14 +35,7 @@
 	};
 
 	export type GameRoomInputMode =
-		| 'text'
-		| 'none'
-		| 'search'
-		| 'tel'
-		| 'url'
-		| 'email'
-		| 'numeric'
-		| 'decimal';
+		'text' | 'none' | 'search' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal';
 
 	export type DebugInfo = {
 		gameKey: string;
